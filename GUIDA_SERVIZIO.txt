@@ -1,0 +1,82 @@
+=====================================================
+    GUIDA GESTIONE SERVIZIO: DIGIHEALTH LAMP
+=====================================================
+
+Questo servizio (digihealth-lamp.service) gestisce l'avvio 
+automatico dello script Python per il monitoraggio 
+ambientale (IAQI, Lux, PM2.5, ecc.).
+
+Il servizio assicura che:
+1. Lo script parta da solo all'accensione della Raspberry.
+2. Lo script venga riavviato automaticamente in caso di crash.
+3. I dati vengano inviati costantemente a Telegraf/InfluxDB.
+
+-----------------------------------------------------
+1. COMANDI DI GESTIONE (DA TERMINALE)
+-----------------------------------------------------
+
+VEDERE SE LA LAMPADA STA GIRANDO:
+sudo systemctl status digihealth-lamp.service
+
+AVVIARE IL SERVIZIO:
+sudo systemctl start digihealth-lamp.service
+
+FERMARE IL SERVIZIO:
+sudo systemctl stop digihealth-lamp.service
+
+RIAVVIARE IL SERVIZIO (es. dopo modifiche al codice):
+sudo systemctl restart digihealth-lamp.service
+
+-----------------------------------------------------
+2. AVVIO AUTOMATICO (BOOT)
+-----------------------------------------------------
+
+ATTIVARE l'avvio automatico all'accensione:
+sudo systemctl enable digihealth-lamp.service
+
+DISATTIVARE l'avvio automatico:
+sudo systemctl disable digihealth-lamp.service
+
+-----------------------------------------------------
+3. VEDERE I DATI E I LOG IN TEMPO REALE
+-----------------------------------------------------
+
+Per vedere i dati IAQI/Lux che lo script sta leggendo 
+mentre il servizio è attivo, usa questo comando:
+
+sudo journalctl -u digihealth-lamp.service -f
+
+(Premi CTRL+C per uscire dalla visualizzazione dei log)
+
+-----------------------------------------------------
+4. PERCORSI DEL PROGETTO
+-----------------------------------------------------
+Cartella progetto: /home/digip/digihealth-lamp
+File di Servizio:  /etc/systemd/system/digihealth-lamp.service
+Ambiente Virtuale: /home/digip/digihealth-lamp/venv/
+=====================================================
+
+-----------------------------------------------------
+5. ESECUZIONE MANUALE PER TEST (DEBUG)
+-----------------------------------------------------
+Se vuoi vedere l'output direttamente nel terminale 
+senza usare il servizio systemd:
+
+1. Ferma il servizio se è attivo:
+   sudo systemctl stop digihealth-lamp.service
+
+2. Lancia lo script manualmente:
+   sudo ./venv/bin/python3 -m digihealth.main
+
+(Nota: Usa CTRL+C per fermarlo. Non usare CTRL+Z.)
+-----------------------------------------------------
+
+
+Ogni volta che farai una modifica importante alla tua lampada, ti basterà la "tripletta magica" per salvare tutto:
+
+git add .
+
+git commit -m "descrizione modifica"
+
+git push
+

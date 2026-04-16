@@ -1,0 +1,61 @@
+# DigiHealth Lamp Configuration
+sensors:
+  zph:
+    port: "/dev/serial0"
+    baudrate: 9600
+    command: [255, 1, 134, 0, 0, 0, 0, 0, 121]
+  light:
+    i2c_bus: 1
+    address: 0x23
+  door:
+    gpio_pin: 18
+  window:
+    gpio_pin: 17
+  microphone:
+    enabled: false  #non presente
+    device_index: null  # Auto-detect
+
+processors:
+  iaqi:
+    enabled: true
+  circadian:
+    enabled: true
+  audio_comfort:
+    enabled: false  #non presente
+    check_duration: 10
+    comfort_duration: 300
+    tolerance_threshold: 45.0
+    critical_threshold: 65.0
+
+actuators:
+  neopixel:
+    enabled: false  #non presente
+    pin: 12
+    num_pixels: 144
+    iaqi_range: [0, 79]
+    circadian_range: [80, 143]
+  shelly:
+    enabled: false #non presente
+    ip: "192.168.1.191"
+    username: ""
+    password: ""
+
+communicator:
+  telegraf:
+    enabled: true
+    measurement: "ZPHSensor_sensore"
+    tags:
+      sensor: "ZPHS01B"
+      host: "raspberry01"
+  ipc:
+    method: "sqlite"  # or "redis"
+    db_path: "/tmp/digihealth.db"
+
+web:
+  enabled: true  
+  host: "0.0.0.0"  #192.168.0.104
+  port: 5000
+
+logging:
+  level: "INFO"
+  file: "/var/log/digihealth-lamp.log"

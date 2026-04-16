@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comfort Audio Control</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --bg-idle: #f2e8db; /* sabbia chiara */
+            --bg-check: #f8e4c6; /* crema calma */
+            --bg-comfort: #f6dcc8; /* pesca soffice */
+            --accent-green: #8a7f7d;
+            --accent-yellow: #d8a47f;
+            --accent-red: #e49571;
+            --accent-zen: #ca8e7b;
+            --text-light: #4d3c2f;
+            --soft-white: rgba(255,255,255,0.6);
+            --panel-shadow: rgba(80, 48, 32, 0.25);
+        }
+
+        body {
+            background: var(--bg-idle);
+            color: var(--text-light);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 8px;
+            overflow: hidden;
+            transition: background 0.5s ease;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 98vh;
+            gap: 10px;
+        }
+
+        .top-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr 1fr 1fr;
+            gap: 8px;
+            background: linear-gradient(140deg, #fdf0e0, #f5dcc4);
+            box-shadow: 0 8px 20px var(--panel-shadow);
+            padding: 14px;
+            border-radius: 20px;
+            align-items: center;
+            border: 1px solid rgba(208, 170, 132, 0.4);
+        }
+
+        #mode-text { font-size: 1.2rem; font-weight: bold; color: var(--accent-yellow); }
+        #db-display { font-size: 2.5rem; font-weight: bold; text-align: center; }
+        .unit { font-size: 1rem; color: #777; }
+
+        .btn {
+            padding: 12px 18px;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 999px;
+            border: 2px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+            color: var(--text-light);
+            background: rgba(0,0,0,0.45);
+        }
+
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+        .ON { background: var(--accent-red); color: white; }
+        .OFF { background: var(--accent-green); color: white; }
+        .btn-exit {
+            background: rgba(255,255,255,0.18);
+            color: rgba(97, 76, 67, 0.85);
+            border: 1px solid rgba(123, 85, 72, 0.25);
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 999px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            opacity: 0.55;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .btn-exit:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+        }
+
+        .volume-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .volume-control label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+        .volume-slider {
+            width: 80px;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-zen);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-zen);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .air-quality-row span {
+            background: rgba(255, 255, 255, 0.4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            min-width: 40px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .timer-panel {
+            text-align: center;
+            padding: 5px;
+        }
+        #timer-label { font-size: 0.9rem; color: #aaa; margin-bottom: 2px; }
+        #timer-val { font-size: 2rem; font-weight: bold; font-family: monospace; }
+
+        #db-container {
+            width: 100%;
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(117, 95, 77, 0.5);
+        }
+        #db-bar { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.1s; }
+
+        #chart {
+            flex-grow: 1;
+            width: 100%;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body id="main-body">
+
+<div class="container">
+    <div class="top-panel">
+        <div>
+            <div id="mode-text">IDLE</div>
+            <div id="timer-label">SISTEMA FERMO</div>
+        </div>
+
+        <div id="db-display">
+            <span id="db-val">0</span><span class="unit"> dB</span>
+        </div>
+
+        <button id="calBtn" class="btn" style="background: #3498db; color: white;" onclick="runCalibration()">Calibra</button>
+        <button id="mainBtn" class="btn OFF" onclick="toggle()">Avvia</button>
+        <div class="volume-control">
+            <label for="volume-slider">Volume</label>
+            <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
+        </div>
+        <button id="exitBtn" class="btn btn-exit" onclick="exitApp()">Esci</button>
+    </div>
+
+    <div class="timer-panel">
+        <div id="timer-val">00:00</div>
+        <div id="db-container"><div id="db-bar"></div></div>
+    </div>
+  
+
+    
+    <div class="air-quality-row" style="display: flex; justify-content: space-around; margin: 10px 0; font-weight: bold;">
+        <div>T: <span id="temp-val">--</span>°C</div>
+        <div>U: <span id="hum-val">--</span>%</div>
+        <div>CO2: <span id="co2-val">--</span></div>
+        <div>IAQI: <span id="iaqi-val">--</span></div>
+    </div>
+
+    <div id="chart"></div>
+</div>
+
+<script>
+    function toggle() {
+        fetch('/toggle');
+    }
+
+    function runCalibration() {
+        const btn = document.getElementById('calBtn');
+        const originalText = btn.innerText;
+        
+        btn.innerText = "ASCOLTO...";
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+
+        fetch('/calibrate')
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) {
+                    alert(data.error);
+                } else {
+                    alert(`Calibrazione completata!\nRumore fondo: ${data.avg} dB\nNuova soglia critica: ${data.new_crit} dB`);
+                }
+            })
+            .finally(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            });
+    }
+
+    function exitApp() {
+        window.close();
+        setTimeout(() => {
+            if (!window.closed) {
+                alert('Se il browser non si chiude automaticamente, premi Alt+F4 oppure usa il comando di chiusura del kiosk.');
+            }
+        }, 250);
+    }
+
+    // Gestione del volume
+    document.getElementById('volume-slider').addEventListener('input', function() {
+        const volume = parseFloat(this.value);
+        fetch('/set_volume', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ volume: volume })
+        });
+    });
+    
+ 
+
+    function refresh() {
+        fetch('/status')
+            .then(res => res.json())
+            .then(data => {
+                const body = document.getElementById('main-body');
+                const modeTxt = document.getElementById('mode-text');
+                const labelTxt = document.getElementById('timer-label');
+                const timerVal = document.getElementById('timer-val');
+                const btn = document.getElementById('mainBtn');
+
+                let currentBg = 'var(--bg-idle)';
+
+                if (!data.active) {
+                    body.style.background = 'var(--bg-idle)';
+                    modeTxt.innerText = 'SISTEMA IDLE';
+                    modeTxt.style.color = '#777';
+                    labelTxt.innerText = 'PRONTO PER AVVIO';
+                    timerVal.innerText = '00:00';
+                    btn.innerText = 'Avvia';
+                    btn.className = 'btn OFF';
+                } else {
+                    btn.innerText = 'Ferma';
+                    btn.className = 'btn ON';
+                    if (data.mode === 'CHECK') {
+                        currentBg = 'var(--bg-check)';
+                        modeTxt.innerText = 'ANALISI AMBIENTE';
+                        modeTxt.style.color = 'var(--accent-yellow)';
+                        labelTxt.innerText = 'FINE ANALISI TRA:';
+                    } else if (data.mode === 'COMFORT') {
+                        currentBg = 'var(--bg-comfort)';
+                        modeTxt.innerText = 'MODALIT� COMFORT';
+                        modeTxt.style.color = 'var(--accent-green)';
+                        labelTxt.innerText = 'FINE RUMORE TRA:';
+                    }
+                    body.style.background = currentBg;
+
+                    const mins = Math.floor(data.countdown / 60);
+                    const secs = data.countdown % 60;
+                    timerVal.innerText = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }
+
+                document.getElementById('db-val').innerText = data.level;
+                const bar = document.getElementById('db-bar');
+                bar.style.width = Math.min(data.level, 100) + '%';
+                if (data.level >= data.th_crit) bar.style.background = 'var(--accent-red)';
+                else if (data.level >= data.th_tol) bar.style.background = 'var(--accent-yellow)';
+                else bar.style.background = 'var(--accent-green)';
+
+                // Aggiorna il volume slider
+                document.getElementById('volume-slider').value = data.volume;
+
+                const trace = {
+                    x: Array.from({length: data.spectrum.length}, (_, i) => i),
+                    y: data.spectrum.length > 0 ? data.spectrum : new Array(20).fill(0),
+                    type: 'bar',
+                    marker: {
+                        color: data.spectrum.map(v => {
+                            if (v >= data.th_crit) return '#ff4757';
+                            if (v >= data.th_tol) return '#ffa502';
+                            return '#2ed573';
+                        }),
+                        line: { width: 1, color: currentBg }
+                    }
+                };
+
+                const layout = {
+                    paper_bgcolor: currentBg,
+                    plot_bgcolor: 'rgba(0,0,0,0.1)',
+                    font: { color: '#4d3c2f', size: 10 },
+                    margin: { t: 10, b: 20, l: 40, r: 10 },
+                    showlegend: false,
+                    yaxis: { range: [0, 100], gridcolor: '#333', fixedrange: true },
+                    xaxis: { showticklabels: false, gridcolor: 'transparent', fixedrange: true },
+                    shapes: [
+                        { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: data.th_tol, y1: data.th_tol, line: { color: 'rgba(255,165,2,0.5)', width: 1, dash: 'dot' } },
+                        { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: data.th_crit, y1: data.th_crit, line: { color: 'rgba(255,71,87,0.8)', width: 2 } }
+                    ]
+                };
+                
+
+                // AGGIORNAMENTO QUALITÀ ARIA
+                    if (data.air_quality) {
+                        const air = data.air_quality;
+                        
+                        // Usiamo i nuovi nomi semplici
+                        document.getElementById('temp-val').innerText = air.temp !== undefined ? air.temp : "--";
+                        document.getElementById('hum-val').innerText  = air.humidity !== undefined ? air.humidity : "--";
+                        document.getElementById('co2-val').innerText  = air.co2 !== undefined ? air.co2 : "--";
+                        
+                        const iaqiElem = document.getElementById('iaqi-val');
+                        if (air.iaqi !== undefined) {
+                            iaqiElem.innerText = air.iaqi;
+                            // Colore dinamico basato sull'IAQI
+                            if (air.iaqi > 100) iaqiElem.style.color = 'var(--accent-red)';
+                            else if (air.iaqi > 50) iaqiElem.style.color = 'var(--accent-yellow)';
+                            else iaqiElem.style.color = 'var(--accent-green)';
+                        }
+                    }
+
+                
+                Plotly.react('chart', [trace], layout, {responsive: true, displayModeBar: false});
+            })
+            .catch(err => console.log('Tentativo di riconnessione al server...', err));
+    }
+
+    setInterval(refresh, 250);
+
+    // Opzionale: chiamala una volta subito all'avvio per non aspettare 2 secondi
+    //window.onload = updateDashboard;
+
+</script>
+
+</body>
+</html>

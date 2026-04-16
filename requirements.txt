@@ -1,0 +1,14 @@
+Flask==3.0.0
+numpy==1.26.0
+PyAudio==0.2.14
+RPi.GPIO
+board
+neopixel
+adafruit-blinka
+smbus2
+pyserial
+requests
+telegraf-pyplug
+pydantic
+pyyaml
+pytest
