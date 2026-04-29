@@ -231,12 +231,15 @@
     }
 
     function exitApp() {
-        window.close();
-        setTimeout(() => {
-            if (!window.closed) {
-                alert('Se il browser non si chiude automaticamente, premi Alt+F4 oppure usa il comando di chiusura del kiosk.');
-            }
-        }, 250);
+        // window.close();
+        // setTimeout(() => {
+        //    if (!window.closed) {
+        //        alert('Se il browser non si chiude automaticamente, premi Alt+F4 oppure usa il comando di chiusura del kiosk.');
+        //    }
+        // }, 250);
+        
+        // Invia un comando al server Flask per chiudere il browser
+        fetch('/shutdown_kiosk');
     }
 
     // Gestione del volume

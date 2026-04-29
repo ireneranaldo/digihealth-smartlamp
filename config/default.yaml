@@ -21,7 +21,7 @@ processors:
   circadian:
     enabled: true
   audio_comfort:
-    enabled: false  #non presente
+    enabled: true  #non presente
     check_duration: 10
     comfort_duration: 300
     tolerance_threshold: 45.0
@@ -29,7 +29,7 @@ processors:
 
 actuators:
   neopixel:
-    enabled: false  #non presente
+    enabled: true  #non presente
     pin: 12
     num_pixels: 144
     iaqi_range: [0, 79]

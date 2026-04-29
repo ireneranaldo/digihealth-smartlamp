@@ -32,7 +32,7 @@ class NeoPixelController:
         try:
             iaqi = data.get('IAQI', 0)
             lux = data.get('lux-IntensitaLuminosa', 0)
-            people = self._read_person_count()
+            people = 0 #self._read_person_count()
 
             # Check time constraints
             if not self._is_active_time():
@@ -71,7 +71,7 @@ class NeoPixelController:
         now = datetime.datetime.now()
         current_minutes = now.hour * 60 + now.minute
         start_minutes = 8 * 60 + 10  # 08:10
-        end_minutes = 17 * 60  # 17:00
+        end_minutes = 17 * 60  # 18:00
         return start_minutes <= current_minutes < end_minutes
 
     def _get_iaqi_color(self, iaqi: int) -> tuple:

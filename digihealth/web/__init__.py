@@ -65,7 +65,10 @@ def set_volume():
         return jsonify({"status": "ok", "volume": vol})
     return jsonify({"status": "error", "message": "Valore mancante"}), 400
 
-
+@app.route('/shutdown_kiosk')
+def shutdown_kiosk():
+    os.system("pkill chromium") # Chiude Chromium brutalmente
+    return "Closing..."
 
 class WebManager:
     def __init__(self):
