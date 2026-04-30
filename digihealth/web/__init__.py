@@ -118,7 +118,7 @@ def _white_noise_loop():
         p = pyaudio.PyAudio()
         CHUNK = 1024
         out_idx = config.sensors.microphone.get('output_device_index', None)
-        kw = dict(format=pyaudio.paInt16, channels=1, rate=44100,
+        kw = dict(format=pyaudio.paInt16, channels=1, rate=16000,
                   output=True, frames_per_buffer=CHUNK)
         if out_idx is not None:
             kw['output_device_index'] = int(out_idx)
@@ -286,4 +286,4 @@ class WebManager:
             except Exception as e:
                 logger.error(f"Impossibile avviare MicrophoneSensor: {e}")
 
-        app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
+        app.run(host=self.host, port=self.port, debug=False, use_reloader=False, threaded=True)

@@ -142,7 +142,7 @@ class MicrophoneSensor(BaseSensor):
                     hi = max(hi, lo + 1)
                     val = float(np.mean(fft_mag[lo:hi]))
                     val = 0.0 if (np.isnan(val) or np.isinf(val)) else val
-                    bar = min(100, int(val / 80))
+                    bar = min(100, int(val / 400))
                     spectrum.append(bar)
 
                 with self._lock:

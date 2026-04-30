@@ -391,66 +391,33 @@ function runCalibration() {
     calTimer = setInterval(() => { secs--; secsEl.innerText = Math.max(0,secs); }, 1000);
 
     fetch('/calibrate').then(() => {
-        // Polling ogni 500ms finché non arriva il risultato
-        const poll = setInterval(() => {
-            fetch('/calibrate/result')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'running') return;
-                    clearInterval(poll);
-                    clearInterval(calTimer);
-                    overlay.classList.remove('visible');
-                    btn.disabled = false;
-                    if (data.error) {
-                        alert('Errore: ' + data.error);
-                    } else {
-                        alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
-                    }
-                });
-        }, 500);
+        // Aspetta 1 secondo prima di iniziare il polling
+        setTimeout(() => {
+            const poll = setInterval(() => {
+                fetch('/calibrate/result')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'running' || data.status === 'idle') return;
+                        clearInterval(poll);
+                        clearInterval(calTimer);
+                        overlay.classList.remove('visible');
+                        btn.disabled = false;
+                        if (data.error) {
+                            alert('Errore: ' + data.error);
+                        } else {
+                            thTol  = data.new_tol;
+                            thCrit = data.new_crit;
+                            alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
+                        }
+                    }).catch(() => {});
+            }, 500);
+        }, 1000);
+    }).catch(() => {
+        clearInterval(calTimer);
+        overlay.classList.remove('visible');
+        btn.disabled = false;
+        alert('Errore di connessione durante la calibrazione.');
     });
-}
-    const btn     = document.getElementById('calBtn');
-    const overlay = document.getElementById('cal-overlay');
-    const secsEl  = document.getElementById('cal-secs');
-    const dbLive  = document.getElementById('cal-db-live');
-
-    btn.disabled   = true;
-    overlay.classList.add('visible');
-    let secs = 10;
-    secsEl.innerText = secs;
-
-    calTimer = setInterval(() => {
-        secs--;
-        secsEl.innerText = secs;
-        if (secs <= 0) clearInterval(calTimer);
-    }, 1000);
-
-    fetch('/calibrate')
-        .then(r => r.json())
-        .then(data => {
-            clearInterval(calTimer);
-            overlay.classList.remove('visible');
-            btn.disabled = false;
-            if (data.error) {
-                alert('Errore: ' + data.error);
-            } else {
-                thTol  = data.new_tol;
-                thCrit = data.new_crit;
-                alert(
-                    `Calibrazione completata!\n` +
-                    `Rumore di fondo: ${data.avg} dB\n` +
-                    `Soglia comfort: ${data.new_tol} dB\n` +
-                    `Soglia critica: ${data.new_crit} dB`
-                );
-            }
-        })
-        .catch(e => {
-            clearInterval(calTimer);
-            overlay.classList.remove('visible');
-            btn.disabled = false;
-            alert('Errore di connessione durante la calibrazione.');
-        });
 }
 
 function toggle() {
