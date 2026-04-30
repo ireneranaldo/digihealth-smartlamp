@@ -12,8 +12,12 @@ sensors:
   window:
     gpio_pin: 17
   microphone:
-    enabled: false  #non presente
-    device_index: null  # Auto-detect
+    enabled: true
+    device_index: 1        # Jabra - solo microfono
+    output_device_index: 0 # bcm2835 - casse collegate jac
+#  microphone:
+#    enabled: true  # presente
+#   device_index: null  # Auto-detect
 
 processors:
   iaqi:

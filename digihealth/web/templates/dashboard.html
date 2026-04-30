@@ -4,369 +4,563 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comfort Audio Control</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         :root {
-            --bg-idle: #f2e8db; /* sabbia chiara */
-            --bg-check: #f8e4c6; /* crema calma */
-            --bg-comfort: #f6dcc8; /* pesca soffice */
-            --accent-green: #8a7f7d;
+            --bg-idle:     #f2e8db;
+            --bg-check:    #f8e4c6;
+            --bg-comfort:  #f6dcc8;
+            --accent-green:  #8a7f7d;
             --accent-yellow: #d8a47f;
-            --accent-red: #e49571;
-            --accent-zen: #ca8e7b;
-            --text-light: #4d3c2f;
-            --soft-white: rgba(255,255,255,0.6);
-            --panel-shadow: rgba(80, 48, 32, 0.25);
+            --accent-red:    #e49571;
+            --accent-zen:    #ca8e7b;
+            --text-light:    #4d3c2f;
+            --panel-shadow:  rgba(80,48,32,0.25);
         }
-
+        * { box-sizing: border-box; }
         body {
             background: var(--bg-idle);
             color: var(--text-light);
             font-family: 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 8px;
+            margin: 0; padding: 6px;
             overflow: hidden;
-            transition: background 0.5s ease;
+            height: 100vh; width: 100vw;
+            transition: background 0.8s ease;
         }
-
         .container {
-            display: flex;
-            flex-direction: column;
-            height: 98vh;
-            gap: 10px;
+            display: flex; flex-direction: column;
+            height: 98vh; gap: 8px;
         }
 
+        /* ---- TOP PANEL ---- */
         .top-panel {
             display: grid;
-            grid-template-columns: 1fr 1fr 1.2fr 1fr 1fr;
+            grid-template-columns: 1.4fr 1fr 1fr 1fr 0.8fr 0.7fr;
             gap: 8px;
             background: linear-gradient(140deg, #fdf0e0, #f5dcc4);
             box-shadow: 0 8px 20px var(--panel-shadow);
-            padding: 14px;
+            padding: 12px 16px;
             border-radius: 20px;
             align-items: center;
-            border: 1px solid rgba(208, 170, 132, 0.4);
+            border: 1px solid rgba(208,170,132,0.4);
         }
+        .mode-block { display: flex; flex-direction: column; gap: 2px; }
+        #mode-text  { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
+        #mode-sub   { font-size: 0.75rem; color: #999; }
 
-        #mode-text { font-size: 1.2rem; font-weight: bold; color: var(--accent-yellow); }
-        #db-display { font-size: 2.5rem; font-weight: bold; text-align: center; }
-        .unit { font-size: 1rem; color: #777; }
+        .db-block   { text-align: center; }
+        #db-display { font-size: 2.6rem; font-weight: bold; line-height: 1; }
+        .unit       { font-size: 0.9rem; color: #999; }
+
+        .threshold-block { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+        .th-row { display: flex; justify-content: space-between; gap: 8px; }
+        .th-label { color: #aaa; }
+        .th-val { font-weight: 700; }
+        #th-tol-val  { color: var(--accent-yellow); }
+        #th-crit-val { color: var(--accent-red); }
 
         .btn {
-            padding: 12px 18px;
-            font-size: 1rem;
-            font-weight: 700;
+            padding: 11px 16px;
+            font-size: 0.95rem; font-weight: 700;
             border-radius: 999px;
             border: 2px solid rgba(255,255,255,0.2);
             cursor: pointer;
             text-transform: uppercase;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.25);
-            color: var(--text-light);
-            background: rgba(0,0,0,0.45);
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+            color: white;
         }
-
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
-        .ON { background: var(--accent-red); color: white; }
-        .OFF { background: var(--accent-green); color: white; }
+        .btn:hover   { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(0,0,0,0.3); }
+        .btn:active  { transform: translateY(0); }
+        .btn-cal     { background: #3498db; }
+        .btn-cal:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-toggle-off { background: #7cb97c; }
+        .btn-toggle-on  { background: var(--accent-red); }
         .btn-exit {
             background: rgba(255,255,255,0.18);
-            color: rgba(97, 76, 67, 0.85);
-            border: 1px solid rgba(123, 85, 72, 0.25);
-            padding: 8px 12px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            border-radius: 999px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            color: rgba(97,76,67,0.85);
+            border: 1px solid rgba(123,85,72,0.25);
+            font-size: 0.78rem; padding: 8px 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             opacity: 0.55;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
         }
-        .btn-exit:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.25);
-        }
+        .btn-exit:hover { opacity: 0.9; }
 
-        .volume-control {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-        }
-        .volume-control label {
-            font-size: 0.8rem;
-            color: var(--text-light);
-        }
+        .volume-block { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .volume-block label { font-size: 0.75rem; color: var(--text-light); }
         .volume-slider {
-            width: 80px;
-            height: 6px;
+            width: 70px; height: 5px;
             border-radius: 3px;
-            background: rgba(255,255,255,0.3);
-            outline: none;
-            -webkit-appearance: none;
+            background: rgba(255,255,255,0.35);
+            outline: none; -webkit-appearance: none;
         }
         .volume-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-zen);
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            -webkit-appearance: none; width: 15px; height: 15px;
+            border-radius: 50%; background: var(--accent-zen);
+            cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.25);
         }
         .volume-slider::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-zen);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-        
-        .air-quality-row span {
-            background: rgba(255, 255, 255, 0.4);
-            padding: 2px 8px;
-            border-radius: 5px;
-            min-width: 40px;
-            display: inline-block;
-            text-align: center;
+            width: 15px; height: 15px; border-radius: 50%;
+            background: var(--accent-zen); cursor: pointer; border: none;
         }
 
-        .timer-panel {
-            text-align: center;
-            padding: 5px;
+        /* ---- TIMER + DB BAR ---- */
+        .meter-panel {
+            display: flex; align-items: center; gap: 12px;
+            padding: 0 4px;
         }
-        #timer-label { font-size: 0.9rem; color: #aaa; margin-bottom: 2px; }
-        #timer-val { font-size: 2rem; font-weight: bold; font-family: monospace; }
-
+        #timer-val { font-size: 1.8rem; font-weight: bold; font-family: monospace; min-width: 70px; }
         #db-container {
-            width: 100%;
-            height: 20px;
-            background: #ddd;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid rgba(117, 95, 77, 0.5);
+            flex: 1; height: 18px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 9px; overflow: hidden;
+            border: 1px solid rgba(117,95,77,0.3);
         }
-        #db-bar { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.1s; }
+        #db-bar { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.12s; border-radius: 9px; }
 
-        #chart {
-            flex-grow: 1;
-            width: 100%;
-            border-radius: 15px;
-            overflow: hidden;
+        /* ---- AIR QUALITY ROW ---- */
+        .air-quality-row {
+            display: flex; justify-content: space-around;
+            font-weight: bold; font-size: 0.9rem;
         }
+        .air-quality-row span {
+            background: rgba(255,255,255,0.4);
+            padding: 2px 10px; border-radius: 6px;
+            min-width: 44px; display: inline-block; text-align: center;
+        }
+
+        /* ---- SPECTRUM CANVAS ---- */
+        #spectrum-wrap {
+            flex: 1;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.07);
+        }
+        #spectrum-canvas {
+            width: 100%; height: 100%;
+            display: block;
+        }
+        #spectrum-overlay {
+            position: absolute; top: 8px; left: 14px;
+            font-size: 0.72rem; color: rgba(77,60,47,0.5);
+            pointer-events: none;
+        }
+        /* soglie orizzontali etichette */
+        #label-tol, #label-crit {
+            position: absolute; right: 10px;
+            font-size: 0.68rem; font-weight: 700;
+            pointer-events: none;
+        }
+        #label-tol  { color: rgba(216,164,127,0.8); }
+        #label-crit { color: rgba(228,149,113,0.9); }
+
+        /* ---- CALIBRATING OVERLAY ---- */
+        #cal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(242,232,219,0.88);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 16px;
+        }
+        #cal-overlay.visible { display: flex; }
+        #cal-title  { font-size: 1.5rem; font-weight: bold; color: var(--accent-yellow); }
+        #cal-ring-wrap { position: relative; width: 100px; height: 100px; }
+        #cal-ring {
+            width: 100px; height: 100px;
+            border: 6px solid rgba(202,142,123,0.2);
+            border-top-color: var(--accent-zen);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        #cal-secs {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; font-weight: bold; font-family: monospace;
+        }
+        #cal-db-live {
+            font-size: 2.2rem; font-weight: bold;
+        }
+        #cal-hint { font-size: 0.85rem; color: #aaa; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body id="main-body">
 
+<!-- CALIBRATION OVERLAY -->
+<div id="cal-overlay">
+    <div id="cal-title">CALIBRAZIONE IN CORSO</div>
+    <div id="cal-ring-wrap">
+        <div id="cal-ring"></div>
+        <div id="cal-secs">10</div>
+    </div>
+    <div id="cal-db-live">-- dB</div>
+    <div id="cal-hint">Stai in silenzio — misuro il rumore di fondo</div>
+</div>
+
 <div class="container">
+
+    <!-- TOP PANEL -->
     <div class="top-panel">
-        <div>
+        <div class="mode-block">
             <div id="mode-text">IDLE</div>
-            <div id="timer-label">SISTEMA FERMO</div>
+            <div id="mode-sub">Sistema fermo</div>
         </div>
 
-        <div id="db-display">
-            <span id="db-val">0</span><span class="unit"> dB</span>
+        <div class="db-block">
+            <div id="db-display"><span id="db-val">0</span><span class="unit"> dB</span></div>
         </div>
 
-        <button id="calBtn" class="btn" style="background: #3498db; color: white;" onclick="runCalibration()">Calibra</button>
-        <button id="mainBtn" class="btn OFF" onclick="toggle()">Avvia</button>
-        <div class="volume-control">
+        <div class="threshold-block">
+            <div class="th-row"><span class="th-label">Soglia comfort</span><span class="th-val" id="th-tol-val">45 dB</span></div>
+            <div class="th-row"><span class="th-label">Soglia critica</span><span class="th-val" id="th-crit-val">65 dB</span></div>
+        </div>
+
+        <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
+        <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
+
+        <div class="volume-block">
             <label for="volume-slider">Volume</label>
-            <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
+            <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.05" value="0.5">
         </div>
-        <button id="exitBtn" class="btn btn-exit" onclick="exitApp()">Esci</button>
+
+        <button class="btn btn-exit" onclick="exitApp()">Esci</button>
     </div>
 
-    <div class="timer-panel">
+    <!-- METER -->
+    <div class="meter-panel">
         <div id="timer-val">00:00</div>
         <div id="db-container"><div id="db-bar"></div></div>
     </div>
-  
 
-    
-    <div class="air-quality-row" style="display: flex; justify-content: space-around; margin: 10px 0; font-weight: bold;">
-        <div>T: <span id="temp-val">--</span>°C</div>
-        <div>U: <span id="hum-val">--</span>%</div>
+    <!-- AIR QUALITY -->
+    <div class="air-quality-row">
+        <div>T: <span id="temp-val">--</span> °C</div>
+        <div>U: <span id="hum-val">--</span> %</div>
         <div>CO2: <span id="co2-val">--</span></div>
         <div>IAQI: <span id="iaqi-val">--</span></div>
     </div>
 
-    <div id="chart"></div>
+    <!-- SPECTRUM -->
+    <div id="spectrum-wrap">
+        <canvas id="spectrum-canvas"></canvas>
+        <div id="spectrum-overlay">SPETTRO FREQUENZE</div>
+        <div id="label-tol">tol</div>
+        <div id="label-crit">crit</div>
+    </div>
+
 </div>
 
 <script>
-    function toggle() {
-        fetch('/toggle');
+// -----------------------------------------------------------------------
+// Canvas spectrum renderer — nessuna libreria esterna necessaria
+// -----------------------------------------------------------------------
+const canvas  = document.getElementById('spectrum-canvas');
+const ctx     = canvas.getContext('2d');
+let currentBg = '#f2e8db';
+let thTol     = 45;
+let thCrit    = 65;
+
+const FREQ_LABELS = [
+    '40', '', '', '', '',
+    '200', '', '', '', '',
+    '1k', '', '', '', '',
+    '4k', '', '', '', '',
+    '16k', '', '', '', '',
+    '', '', '', '', '',
+    '', '', '', '', '',
+    '', '', '', '', '',
+    '', '', '', '', '',
+    '', '', '', '', '',
+    '', '', '', ''
+];
+
+function resizeCanvas() {
+    const wrap = document.getElementById('spectrum-wrap');
+    canvas.width  = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function barColor(val, peak) {
+    if (peak)       return 'rgba(228,149,113,0.9)';
+    if (val > 75)   return '#e49571';
+    if (val > 45)   return '#d8a47f';
+    return '#8fbfae';
+}
+
+// Peak-hold per ogni barra
+const peakHold    = new Array(48).fill(0);
+const peakDecay   = new Array(48).fill(0);
+const PEAK_FRAMES = 18;
+
+function drawSpectrum(spectrum) {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const n    = spectrum.length || 48;
+    const gap  = 2;
+    const barW = Math.max(2, (W - gap * (n + 1)) / n);
+
+    // Linee soglia
+    const yTol  = H - (thTol / 100)  * H;
+    const yCrit = H - (thCrit / 100) * H;
+
+    // tol line
+    ctx.strokeStyle = 'rgba(216,164,127,0.45)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, yTol);  ctx.lineTo(W, yTol);  ctx.stroke();
+    ctx.setLineDash([]);
+
+    // crit line
+    ctx.strokeStyle = 'rgba(228,149,113,0.8)';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, yCrit); ctx.lineTo(W, yCrit); ctx.stroke();
+
+    // Posiziona etichette soglia
+    document.getElementById('label-tol').style.top  = Math.max(4,  yTol  - 14) + 'px';
+    document.getElementById('label-crit').style.top = Math.max(4, yCrit - 14) + 'px';
+
+    for (let i = 0; i < n; i++) {
+        const val  = Math.min(100, spectrum[i] || 0);
+        const x    = gap + i * (barW + gap);
+        const barH = (val / 100) * (H - 20);
+        const y    = H - barH;
+
+        // Aggiorna peak hold
+        if (val >= peakHold[i]) {
+            peakHold[i]  = val;
+            peakDecay[i] = PEAK_FRAMES;
+        } else {
+            if (peakDecay[i] > 0) peakDecay[i]--;
+            else peakHold[i] = Math.max(0, peakHold[i] - 1.5);
+        }
+
+        // Gradiente barra
+        const grad = ctx.createLinearGradient(x, y, x, H);
+        if (val > 75) {
+            grad.addColorStop(0, 'rgba(228,100,71,0.9)');
+            grad.addColorStop(1, 'rgba(228,149,113,0.5)');
+        } else if (val > 45) {
+            grad.addColorStop(0, 'rgba(216,164,127,0.9)');
+            grad.addColorStop(1, 'rgba(216,164,127,0.4)');
+        } else {
+            grad.addColorStop(0, 'rgba(100,180,155,0.85)');
+            grad.addColorStop(1, 'rgba(100,180,155,0.25)');
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, barH, [3, 3, 0, 0]);
+        ctx.fill();
+
+        // Etichetta frequenza
+        if (FREQ_LABELS[i]) {
+            ctx.fillStyle = 'rgba(77,60,47,0.4)';
+            ctx.font      = '9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(FREQ_LABELS[i], x + barW / 2, H - 2);
+        }
+
+        // Peak dot
+        const peakH = (peakHold[i] / 100) * (H - 20);
+        const peakY = H - peakH - 2;
+        if (peakHold[i] > 2) {
+            ctx.fillStyle = 'rgba(228,100,71,0.7)';
+            ctx.fillRect(x, peakY, barW, 2);
+        }
     }
+}
 
-    function runCalibration() {
-        const btn = document.getElementById('calBtn');
-        const originalText = btn.innerText;
-        
-        btn.innerText = "ASCOLTO...";
-        btn.disabled = true;
-        btn.style.opacity = "0.5";
+// -----------------------------------------------------------------------
+// Calibrazione countdown lato client
+// -----------------------------------------------------------------------
+let calTimer = null;
 
-        fetch('/calibrate')
-            .then(res => res.json())
-            .then(data => {
-                if(data.error) {
-                    alert(data.error);
-                } else {
-                    alert(`Calibrazione completata!\nRumore fondo: ${data.avg} dB\nNuova soglia critica: ${data.new_crit} dB`);
-                }
-            })
-            .finally(() => {
-                btn.innerText = originalText;
-                btn.disabled = false;
-                btn.style.opacity = "1";
-            });
-    }
+function runCalibration() {
+    const btn = document.getElementById('calBtn');
+    const overlay = document.getElementById('cal-overlay');
+    const secsEl = document.getElementById('cal-secs');
 
-    function exitApp() {
-        // window.close();
-        // setTimeout(() => {
-        //    if (!window.closed) {
-        //        alert('Se il browser non si chiude automaticamente, premi Alt+F4 oppure usa il comando di chiusura del kiosk.');
-        //    }
-        // }, 250);
-        
-        // Invia un comando al server Flask per chiudere il browser
-        fetch('/shutdown_kiosk');
-    }
+    btn.disabled = true;
+    overlay.classList.add('visible');
+    let secs = 10;
+    secsEl.innerText = secs;
+    calTimer = setInterval(() => { secs--; secsEl.innerText = Math.max(0,secs); }, 1000);
 
-    // Gestione del volume
-    document.getElementById('volume-slider').addEventListener('input', function() {
-        const volume = parseFloat(this.value);
-        fetch('/set_volume', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ volume: volume })
-        });
+    fetch('/calibrate').then(() => {
+        // Polling ogni 500ms finché non arriva il risultato
+        const poll = setInterval(() => {
+            fetch('/calibrate/result')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'running') return;
+                    clearInterval(poll);
+                    clearInterval(calTimer);
+                    overlay.classList.remove('visible');
+                    btn.disabled = false;
+                    if (data.error) {
+                        alert('Errore: ' + data.error);
+                    } else {
+                        alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
+                    }
+                });
+        }, 500);
     });
-    
- 
+}
+    const btn     = document.getElementById('calBtn');
+    const overlay = document.getElementById('cal-overlay');
+    const secsEl  = document.getElementById('cal-secs');
+    const dbLive  = document.getElementById('cal-db-live');
 
-    function refresh() {
-        fetch('/status')
-            .then(res => res.json())
-            .then(data => {
-                const body = document.getElementById('main-body');
-                const modeTxt = document.getElementById('mode-text');
-                const labelTxt = document.getElementById('timer-label');
-                const timerVal = document.getElementById('timer-val');
-                const btn = document.getElementById('mainBtn');
+    btn.disabled   = true;
+    overlay.classList.add('visible');
+    let secs = 10;
+    secsEl.innerText = secs;
 
-                let currentBg = 'var(--bg-idle)';
+    calTimer = setInterval(() => {
+        secs--;
+        secsEl.innerText = secs;
+        if (secs <= 0) clearInterval(calTimer);
+    }, 1000);
 
-                if (!data.active) {
-                    body.style.background = 'var(--bg-idle)';
-                    modeTxt.innerText = 'SISTEMA IDLE';
-                    modeTxt.style.color = '#777';
-                    labelTxt.innerText = 'PRONTO PER AVVIO';
-                    timerVal.innerText = '00:00';
-                    btn.innerText = 'Avvia';
-                    btn.className = 'btn OFF';
-                } else {
-                    btn.innerText = 'Ferma';
-                    btn.className = 'btn ON';
-                    if (data.mode === 'CHECK') {
-                        currentBg = 'var(--bg-check)';
-                        modeTxt.innerText = 'ANALISI AMBIENTE';
-                        modeTxt.style.color = 'var(--accent-yellow)';
-                        labelTxt.innerText = 'FINE ANALISI TRA:';
-                    } else if (data.mode === 'COMFORT') {
-                        currentBg = 'var(--bg-comfort)';
-                        modeTxt.innerText = 'MODALIT� COMFORT';
-                        modeTxt.style.color = 'var(--accent-green)';
-                        labelTxt.innerText = 'FINE RUMORE TRA:';
-                    }
-                    body.style.background = currentBg;
+    fetch('/calibrate')
+        .then(r => r.json())
+        .then(data => {
+            clearInterval(calTimer);
+            overlay.classList.remove('visible');
+            btn.disabled = false;
+            if (data.error) {
+                alert('Errore: ' + data.error);
+            } else {
+                thTol  = data.new_tol;
+                thCrit = data.new_crit;
+                alert(
+                    `Calibrazione completata!\n` +
+                    `Rumore di fondo: ${data.avg} dB\n` +
+                    `Soglia comfort: ${data.new_tol} dB\n` +
+                    `Soglia critica: ${data.new_crit} dB`
+                );
+            }
+        })
+        .catch(e => {
+            clearInterval(calTimer);
+            overlay.classList.remove('visible');
+            btn.disabled = false;
+            alert('Errore di connessione durante la calibrazione.');
+        });
+}
 
-                    const mins = Math.floor(data.countdown / 60);
-                    const secs = data.countdown % 60;
-                    timerVal.innerText = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-                }
+function toggle() {
+    fetch('/toggle').catch(() => {});
+}
 
-                document.getElementById('db-val').innerText = data.level;
-                const bar = document.getElementById('db-bar');
-                bar.style.width = Math.min(data.level, 100) + '%';
-                if (data.level >= data.th_crit) bar.style.background = 'var(--accent-red)';
-                else if (data.level >= data.th_tol) bar.style.background = 'var(--accent-yellow)';
-                else bar.style.background = 'var(--accent-green)';
+document.getElementById('volume-slider').addEventListener('input', function () {
+    fetch('/set_volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: parseFloat(this.value) })
+    }).catch(() => {});
+});
 
-                // Aggiorna il volume slider
-                document.getElementById('volume-slider').value = data.volume;
+function exitApp() {
+    fetch('/shutdown_kiosk').catch(() => {});
+}
 
-                const trace = {
-                    x: Array.from({length: data.spectrum.length}, (_, i) => i),
-                    y: data.spectrum.length > 0 ? data.spectrum : new Array(20).fill(0),
-                    type: 'bar',
-                    marker: {
-                        color: data.spectrum.map(v => {
-                            if (v >= data.th_crit) return '#ff4757';
-                            if (v >= data.th_tol) return '#ffa502';
-                            return '#2ed573';
-                        }),
-                        line: { width: 1, color: currentBg }
-                    }
-                };
+// -----------------------------------------------------------------------
+// Refresh loop 4 volte al secondo
+// -----------------------------------------------------------------------
+function refresh() {
+    fetch('/status')
+        .then(r => r.json())
+        .then(data => {
+            const body    = document.getElementById('main-body');
+            const modeTxt = document.getElementById('mode-text');
+            const modeSub = document.getElementById('mode-sub');
+            const timerEl = document.getElementById('timer-val');
+            const btn     = document.getElementById('mainBtn');
 
-                const layout = {
-                    paper_bgcolor: currentBg,
-                    plot_bgcolor: 'rgba(0,0,0,0.1)',
-                    font: { color: '#4d3c2f', size: 10 },
-                    margin: { t: 10, b: 20, l: 40, r: 10 },
-                    showlegend: false,
-                    yaxis: { range: [0, 100], gridcolor: '#333', fixedrange: true },
-                    xaxis: { showticklabels: false, gridcolor: 'transparent', fixedrange: true },
-                    shapes: [
-                        { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: data.th_tol, y1: data.th_tol, line: { color: 'rgba(255,165,2,0.5)', width: 1, dash: 'dot' } },
-                        { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: data.th_crit, y1: data.th_crit, line: { color: 'rgba(255,71,87,0.8)', width: 2 } }
-                    ]
-                };
-                
+            // Aggiorna soglie locali
+            thTol  = data.th_tol;
+            thCrit = data.th_crit;
+            document.getElementById('th-tol-val').innerText  = thTol  + ' dB';
+            document.getElementById('th-crit-val').innerText = thCrit + ' dB';
 
-                // AGGIORNAMENTO QUALITÀ ARIA
-                    if (data.air_quality) {
-                        const air = data.air_quality;
-                        
-                        // Usiamo i nuovi nomi semplici
-                        document.getElementById('temp-val').innerText = air.temp !== undefined ? air.temp : "--";
-                        document.getElementById('hum-val').innerText  = air.humidity !== undefined ? air.humidity : "--";
-                        document.getElementById('co2-val').innerText  = air.co2 !== undefined ? air.co2 : "--";
-                        
-                        const iaqiElem = document.getElementById('iaqi-val');
-                        if (air.iaqi !== undefined) {
-                            iaqiElem.innerText = air.iaqi;
-                            // Colore dinamico basato sull'IAQI
-                            if (air.iaqi > 100) iaqiElem.style.color = 'var(--accent-red)';
-                            else if (air.iaqi > 50) iaqiElem.style.color = 'var(--accent-yellow)';
-                            else iaqiElem.style.color = 'var(--accent-green)';
-                        }
-                    }
+            // Stato / modalità
+            if (!data.active) {
+                currentBg = 'var(--bg-idle)';
+                modeTxt.innerText   = 'SISTEMA IDLE';
+                modeTxt.style.color = '#aaa';
+                modeSub.innerText   = 'Pronto per avvio';
+                timerEl.innerText   = '00:00';
+                btn.innerText       = 'Avvia';
+                btn.className       = 'btn btn-toggle-off';
+            } else if (data.mode === 'CALIBRATING') {
+                currentBg = 'var(--bg-idle)';
+                modeTxt.innerText   = 'CALIBRAZIONE';
+                modeTxt.style.color = '#3498db';
+                modeSub.innerText   = 'Ascolto rumore di fondo…';
+            } else if (data.mode === 'CHECK') {
+                currentBg = 'var(--bg-check)';
+                modeTxt.innerText   = 'ANALISI AMBIENTE';
+                modeTxt.style.color = 'var(--accent-yellow)';
+                modeSub.innerText   = 'Monitoraggio attivo';
+                btn.innerText       = 'Ferma';
+                btn.className       = 'btn btn-toggle-on';
+                const m = Math.floor(data.countdown / 60);
+                const s = data.countdown % 60;
+                timerEl.innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            } else if (data.mode === 'COMFORT') {
+                currentBg = 'var(--bg-comfort)';
+                modeTxt.innerText   = 'MODALITÀ COMFORT';
+                modeTxt.style.color = 'var(--accent-red)';
+                modeSub.innerText   = 'Rumore bianco attivo';
+                btn.innerText       = 'Ferma';
+                btn.className       = 'btn btn-toggle-on';
+                const m = Math.floor(data.countdown / 60);
+                const s = data.countdown % 60;
+                timerEl.innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            }
 
-                
-                Plotly.react('chart', [trace], layout, {responsive: true, displayModeBar: false});
-            })
-            .catch(err => console.log('Tentativo di riconnessione al server...', err));
-    }
+            body.style.background = currentBg;
 
-    setInterval(refresh, 250);
+            // dB display + barra
+            const db  = data.level || 0;
+            document.getElementById('db-val').innerText = db.toFixed ? db.toFixed(1) : db;
+            const pct = Math.min(db, 100);
+            const bar = document.getElementById('db-bar');
+            bar.style.width = pct + '%';
+            bar.style.background = db >= thCrit ? '#e49571' : db >= thTol ? '#d8a47f' : '#8fbfae';
 
-    // Opzionale: chiamala una volta subito all'avvio per non aspettare 2 secondi
-    //window.onload = updateDashboard;
+            // Volume slider sync
+            document.getElementById('volume-slider').value = data.volume;
 
+            // Aggiorna spettro canvas
+            drawSpectrum(data.spectrum || []);
+
+            // Qualità aria
+            if (data.air_quality) {
+                const a = data.air_quality;
+                document.getElementById('temp-val').innerText = a.temp     ?? '--';
+                document.getElementById('hum-val').innerText  = a.humidity ?? '--';
+                document.getElementById('co2-val').innerText  = a.co2      ?? '--';
+                const iEl = document.getElementById('iaqi-val');
+                iEl.innerText   = a.iaqi ?? '--';
+                iEl.style.color = a.iaqi > 100 ? 'var(--accent-red)'
+                                : a.iaqi > 50  ? 'var(--accent-yellow)'
+                                : 'inherit';
+            }
+
+            // Aggiorna anche il live-dB nell'overlay calibrazione se visibile
+            document.getElementById('cal-db-live').innerText = db.toFixed ? db.toFixed(1) + ' dB' : db + ' dB';
+        })
+        .catch(() => {});
+}
+
+setInterval(refresh, 250);
+refresh();
 </script>
-
 </body>
 </html>
