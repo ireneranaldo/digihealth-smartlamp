@@ -1,4 +1,4 @@
-import os, time, threading, logging, subprocess, wave, struct, random
+import os, time, threading, logging, subprocess, wave, struct, random, signal
 import numpy as np
 from flask import Flask, render_template, jsonify, request
 from ..config import config
@@ -160,10 +160,13 @@ def _start_file_audio():
         if not fn or not os.path.isfile(fp):
             logger.error(f"File audio non trovato: {fp}")
             return
-        for cmd in [["mpg123", "-q", "--loop", "-1", fp],
+        vol_factor = int(32768 * state.get("volume", 0.5))
+        for cmd in [["mpg123", "-q", "--loop", "-1", "-f", str(vol_factor), fp],
                     ["cvlc", "--loop", "--quiet", fp]]:
             try:
-                _file_proc = subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+                _file_proc = subprocess.Popen(
+                    cmd, stderr=subprocess.DEVNULL, start_new_session=True
+                )
                 logger.info(f"File audio avviato: {fn}")
                 return
             except FileNotFoundError:
@@ -175,10 +178,23 @@ def _start_white_noise():
     with _file_lock:
         _stop_file_audio_unsafe()
         wav = _make_white_noise_wav()
-        # aplay con loop infinito tramite script bash
-        cmd = ["bash", "-c", f"while true; do aplay -q {wav}; done"]
+        vol_factor = int(32768 * state.get("volume", 0.5))
+        # Prima prova mpg123 (loop nativo, volume controllabile, processo singolo)
         try:
-            _file_proc = subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+            _file_proc = subprocess.Popen(
+                ["mpg123", "-q", "--loop", "-1", "-f", str(vol_factor), wav],
+                stderr=subprocess.DEVNULL, start_new_session=True
+            )
+            logger.info("Rumore bianco avviato (mpg123)")
+            return
+        except FileNotFoundError:
+            pass
+        # Fallback: bash loop con aplay — start_new_session per killare tutto il process group
+        try:
+            _file_proc = subprocess.Popen(
+                ["bash", "-c", f"while true; do aplay -q '{wav}'; done"],
+                stderr=subprocess.DEVNULL, start_new_session=True
+            )
             logger.info("Rumore bianco avviato (aplay loop)")
         except Exception as e:
             logger.error(f"Impossibile avviare rumore bianco: {e}")
@@ -186,9 +202,18 @@ def _start_white_noise():
 def _stop_file_audio_unsafe():
     global _file_proc
     if _file_proc and _file_proc.poll() is None:
-        _file_proc.terminate()
-        try: _file_proc.wait(timeout=3)
-        except subprocess.TimeoutExpired: _file_proc.kill()
+        # Killa l'intero process group (fix: bash non propaga SIGTERM ad aplay)
+        try:
+            os.killpg(os.getpgid(_file_proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError):
+            _file_proc.terminate()
+        try:
+            _file_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(_file_proc.pid), signal.SIGKILL)
+            except Exception:
+                _file_proc.kill()
         _file_proc = None
         logger.info("File audio fermato")
 
@@ -216,6 +241,7 @@ def _logic_loop():
             state["countdown"] = i
             if state["level"] >= state["th_crit"]:
                 needs_comfort = True
+                break  # soglia superata → interrompe subito il CHECK
             time.sleep(1)
 
         if _logic_stop_flag.is_set(): break
@@ -228,18 +254,18 @@ def _logic_loop():
         logger.info(f"COMFORT avviato ({state['comfort_mode']}) per {TEMPO_COMFORT_SEC}s")
         state["mode"] = "COMFORT"
 
-        # Se file audio → avvia mpg123
         if state["comfort_mode"] == "file":
             _start_file_audio()
+        else:
+            _start_white_noise()
 
         for i in range(TEMPO_COMFORT_SEC, 0, -1):
             if _logic_stop_flag.is_set(): break
             state["countdown"] = i
             time.sleep(1)
 
-        # Ferma file audio se attivo
-        if state["comfort_mode"] == "file":
-            _stop_file_audio()
+        # Ferma sempre l'audio (sia file che white_noise usano _file_proc)
+        _stop_file_audio()
 
         if _logic_stop_flag.is_set(): break
 
