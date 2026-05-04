@@ -526,9 +526,18 @@ function exitApp() {
 }
 
 // -----------------------------------------------------------------------
-// Refresh loop 4 volte al secondo
+// Refresh loop — setTimeout chain invece di setInterval
+// Evita l'accumulo di richieste pendenti se il Pi è sotto carico
 // -----------------------------------------------------------------------
+let _refreshPending = false;
+
+function scheduleRefresh() {
+    setTimeout(refresh, 500);  // 2 volte al secondo, non 4
+}
+
 function refresh() {
+    if (_refreshPending) { scheduleRefresh(); return; }
+    _refreshPending = true;
     fetch('/status')
         .then(r => r.json())
         .then(data => {
@@ -612,11 +621,14 @@ function refresh() {
             // Aggiorna anche il live-dB nell'overlay calibrazione se visibile
             document.getElementById('cal-db-live').innerText = db.toFixed ? db.toFixed(1) + ' dB' : db + ' dB';
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+            _refreshPending = false;
+            scheduleRefresh();
+        });
 }
 
-setInterval(refresh, 250);
-refresh();
+scheduleRefresh();
 </script>
 </body>
 </html>

@@ -3,24 +3,23 @@ import pyaudio
 from ..logger import logger
 
 class AudioSensor:
-    def __init__(self):
-        self.p = pyaudio.PyAudio()
-        self.CHUNK = 1024
-        self.RATE = 44100
-        try:
-            # Apriamo lo stream sia in input che in output
-            self.stream = self.p.open(
-                format=pyaudio.paInt16, 
-                channels=1, 
-                rate=self.RATE,
-                input=True, 
-                output=True,
-                frames_per_buffer=self.CHUNK
-            )
-            logger.info("AudioSensor: Stream PyAudio aperto con successo (In/Out)")
-        except Exception as e:
-            logger.error(f"AudioSensor: Errore apertura stream: {e}")
-            self.stream = None
+# modifica
+def __init__(self):
+    self.p = pyaudio.PyAudio()
+    self.CHUNK = 1024
+    self.RATE = 16000 # Allinea il rate a quello degli altri moduli
+    try:
+        self.stream = self.p.open(
+            format=pyaudio.paInt16, 
+            channels=1, 
+            rate=self.RATE,
+            input=True, 
+            output=False, # MODIFICA DA TRUE A FALSE
+            frames_per_buffer=self.CHUNK
+        )
+        logger.info("AudioSensor: Stream Microfono aperto (Solo Input)")
+    except Exception as e:
+        logger.error(f"Errore apertura stream: {e}")
 
     def collect(self):
         """Legge dal microfono, calcola i dB e lo spettro FFT"""

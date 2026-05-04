@@ -25,11 +25,11 @@ processors:
   circadian:
     enabled: true
   audio_comfort:
-    enabled: true  #non presente
-    check_duration: 10
+    enabled: true
+    check_duration: 10      
     comfort_duration: 300
     tolerance_threshold: 45.0
-    critical_threshold: 65.0
+    critical_threshold: 55.0
 
 actuators:
   neopixel:
