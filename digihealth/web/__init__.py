@@ -2,6 +2,7 @@ import os
 import time
 import threading
 import logging
+import subprocess
 import numpy as np
 
 from flask import Flask, render_template, jsonify, request
@@ -12,6 +13,10 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 base_dir     = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(base_dir, 'templates')
+# Cartella audio relativa alla root del progetto
+AUDIO_DIR    = os.path.join(os.path.dirname(base_dir), '..', 'audio')
+AUDIO_DIR    = os.path.normpath(AUDIO_DIR)
+
 app = Flask(__name__, template_folder=template_dir)
 
 # ---------------------------------------------------------------------------
@@ -27,6 +32,8 @@ state = {
     "volume":        0.5,
     "spectrum":      [0] * 48,
     "needs_comfort": False,
+    "comfort_mode":  "white_noise",   # "white_noise" | "file"
+    "audio_file":    "",              # nome file selezionato
     "air_quality": {
         "temp":     "--",
         "humidity": "--",
@@ -45,7 +52,7 @@ TEMPO_COMFORT_SEC = int(_ac_cfg.get('comfort_duration', 300))
 CALIBRATION_SECS  = 10
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers microfono
 # ---------------------------------------------------------------------------
 def _read_mic():
     if _mic_sensor is not None:
@@ -88,15 +95,21 @@ def _logic_loop():
 
         if _comfort_event.is_set():
             state["mode"] = "COMFORT"
-            _start_white_noise_thread()
+            # Avvia la sorgente audio scelta
+            if state["comfort_mode"] == "file" and state["audio_file"]:
+                _start_audio_file()
+            else:
+                _start_white_noise_thread()
+
             for i in range(TEMPO_COMFORT_SEC, 0, -1):
                 if not state["active"]:
-                    _stop_white_noise()
+                    _stop_all_audio()
                     state["mode"] = "IDLE"; state["countdown"] = 0; return
                 state["countdown"] = i
                 _update_audio_state()
                 time.sleep(1)
-            _stop_white_noise()
+
+            _stop_all_audio()
 
 def _start_logic_thread():
     global _logic_thread
@@ -146,6 +159,51 @@ def _stop_white_noise():
     _noise_running = False
 
 # ---------------------------------------------------------------------------
+# Riproduzione file audio (mpg123 in loop)
+# ---------------------------------------------------------------------------
+_audio_process = None
+
+def _start_audio_file():
+    global _audio_process
+    _stop_audio_file()
+    filename = state.get("audio_file", "")
+    if not filename:
+        return
+    filepath = os.path.join(AUDIO_DIR, filename)
+    if not os.path.isfile(filepath):
+        logger.error(f"File audio non trovato: {filepath}")
+        return
+    try:
+        # mpg123 --loop -1 = loop infinito
+        # -q = quiet (nessun output su stdout)
+        cmd = ["mpg123", "-q", "--loop", "-1", filepath]
+        _audio_process = subprocess.Popen(cmd)
+        logger.info(f"File audio avviato: {filename}")
+    except FileNotFoundError:
+        # mpg123 non installato, fallback su aplay per WAV o omxplayer
+        try:
+            cmd = ["cvlc", "--loop", "--quiet", filepath]
+            _audio_process = subprocess.Popen(cmd)
+            logger.info(f"File audio avviato con vlc: {filename}")
+        except Exception as e2:
+            logger.error(f"Impossibile riprodurre audio: {e2}")
+
+def _stop_audio_file():
+    global _audio_process
+    if _audio_process and _audio_process.poll() is None:
+        _audio_process.terminate()
+        try:
+            _audio_process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            _audio_process.kill()
+        _audio_process = None
+        logger.info("File audio fermato")
+
+def _stop_all_audio():
+    _stop_white_noise()
+    _stop_audio_file()
+
+# ---------------------------------------------------------------------------
 # Route Flask
 # ---------------------------------------------------------------------------
 @app.route('/')
@@ -169,22 +227,23 @@ def toggle():
     else:
         state["mode"] = "IDLE"
         state["countdown"] = 0
-        _stop_white_noise()
+        _stop_all_audio()
         logger.info("AudioComfort OFF")
     return jsonify({"status": "ok", "active": state["active"]})
 
+# --- Calibrazione asincrona ---
 _cal_result = {"status": "idle"}
 
 @app.route('/calibrate')
 def calibrate():
     global _cal_result
     _cal_result = {"status": "running"}
-    
+
     def _do_calibrate():
         global _cal_result
         was_active = state["active"]
         state["active"] = False
-        _stop_white_noise()
+        _stop_all_audio()
         state["mode"] = "CALIBRATING"
 
         db_samples = []
@@ -215,7 +274,7 @@ def calibrate():
             state["mode"]   = "CHECK"
             _start_logic_thread()
 
-        _cal_result = {"status": "ok", "avg": round(avg,1),
+        _cal_result = {"status": "ok", "avg": round(avg, 1),
                        "new_tol": new_tol, "new_crit": new_crit}
 
     threading.Thread(target=_do_calibrate, daemon=True).start()
@@ -224,7 +283,38 @@ def calibrate():
 @app.route('/calibrate/result')
 def calibrate_result():
     return jsonify(_cal_result)
-    
+
+# --- Impostazioni comfort ---
+@app.route('/set_comfort_mode', methods=['POST'])
+def set_comfort_mode():
+    data = request.get_json(silent=True) or {}
+    mode = data.get('mode', 'white_noise')
+    if mode in ('white_noise', 'file'):
+        state["comfort_mode"] = mode
+        return jsonify({"status": "ok", "comfort_mode": mode})
+    return jsonify({"status": "error"}), 400
+
+@app.route('/set_audio_file', methods=['POST'])
+def set_audio_file():
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename', '')
+    filepath = os.path.join(AUDIO_DIR, filename)
+    if filename and os.path.isfile(filepath):
+        state["audio_file"] = filename
+        return jsonify({"status": "ok", "audio_file": filename})
+    return jsonify({"status": "error", "message": "File non trovato"}), 404
+
+@app.route('/audio_files')
+def audio_files():
+    """Restituisce la lista dei file MP3/WAV nella cartella audio."""
+    os.makedirs(AUDIO_DIR, exist_ok=True)
+    files = [
+        f for f in os.listdir(AUDIO_DIR)
+        if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac'))
+    ]
+    files.sort()
+    return jsonify({"files": files})
+
 @app.route('/set_volume', methods=['POST', 'GET'])
 def set_volume():
     if request.method == 'POST':
@@ -272,6 +362,7 @@ class WebManager:
             logger.error(f"Errore aggiornamento dati web: {e}")
 
     def run(self):
+        os.makedirs(AUDIO_DIR, exist_ok=True)
         mic_cfg = config.sensors.microphone
         if mic_cfg.get('enabled', False):
             try:
@@ -286,4 +377,5 @@ class WebManager:
             except Exception as e:
                 logger.error(f"Impossibile avviare MicrophoneSensor: {e}")
 
-        app.run(host=self.host, port=self.port, debug=False, use_reloader=False, threaded=True)
+        app.run(host=self.host, port=self.port, debug=False,
+                use_reloader=False, threaded=True)

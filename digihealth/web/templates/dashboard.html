@@ -34,7 +34,7 @@
         /* ---- TOP PANEL ---- */
         .top-panel {
             display: grid;
-            grid-template-columns: 1.4fr 1fr 1fr 1fr 0.8fr 0.7fr;
+            grid-template-columns: 1.2fr 0.9fr 0.9fr 1.4fr 0.8fr 0.6fr 0.6fr;
             gap: 8px;
             background: linear-gradient(140deg, #fdf0e0, #f5dcc4);
             box-shadow: 0 8px 20px var(--panel-shadow);
@@ -85,7 +85,22 @@
         }
         .btn-exit:hover { opacity: 0.9; }
 
-        .volume-block { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .audio-block { display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; }
+        .audio-block label { color: #aaa; font-size: 0.72rem; }
+        .audio-toggle { display: flex; gap: 6px; }
+        .audio-toggle button {
+            flex: 1; padding: 4px 6px; border-radius: 20px; border: 1px solid rgba(202,142,123,0.4);
+            background: rgba(255,255,255,0.3); color: var(--text-light);
+            font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+        }
+        .audio-toggle button.active { background: var(--accent-zen); color: white; border-color: transparent; }
+        #audio-file-select {
+            width: 100%; padding: 3px 6px; border-radius: 8px;
+            border: 1px solid rgba(202,142,123,0.4);
+            background: rgba(255,255,255,0.4); color: var(--text-light);
+            font-size: 0.72rem; display: none;
+        }
+        #audio-file-select.visible { display: block; }
         .volume-block label { font-size: 0.75rem; color: var(--text-light); }
         .volume-slider {
             width: 70px; height: 5px;
@@ -219,6 +234,17 @@
 
         <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
         <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
+
+        <div class="audio-block">
+            <label>Modalità comfort</label>
+            <div class="audio-toggle">
+                <button id="btn-noise" class="active" onclick="setComfortMode('white_noise')">⬜ Rumore</button>
+                <button id="btn-file"  onclick="setComfortMode('file')">🎵 File</button>
+            </div>
+            <select id="audio-file-select" onchange="setAudioFile(this.value)">
+                <option value="">— scegli file —</option>
+            </select>
+        </div>
 
         <div class="volume-block">
             <label for="volume-slider">Volume</label>
@@ -380,44 +406,107 @@ function drawSpectrum(spectrum) {
 let calTimer = null;
 
 function runCalibration() {
-    const btn = document.getElementById('calBtn');
-    const overlay = document.getElementById('cal-overlay');
+    const btn    = document.getElementById('calBtn');
+    const overlay= document.getElementById('cal-overlay');
     const secsEl = document.getElementById('cal-secs');
+    const dbLive = document.getElementById('cal-db-live');
 
     btn.disabled = true;
     overlay.classList.add('visible');
+
+    // Countdown visivo 10→0
     let secs = 10;
     secsEl.innerText = secs;
-    calTimer = setInterval(() => { secs--; secsEl.innerText = Math.max(0,secs); }, 1000);
+    if (calTimer) clearInterval(calTimer);
+    calTimer = setInterval(() => {
+        secs = Math.max(0, secs - 1);
+        secsEl.innerText = secs;
+    }, 1000);
 
-    fetch('/calibrate').then(() => {
-        // Aspetta 1 secondo prima di iniziare il polling
-        setTimeout(() => {
-            const poll = setInterval(() => {
-                fetch('/calibrate/result')
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.status === 'running' || data.status === 'idle') return;
-                        clearInterval(poll);
-                        clearInterval(calTimer);
-                        overlay.classList.remove('visible');
-                        btn.disabled = false;
-                        if (data.error) {
-                            alert('Errore: ' + data.error);
-                        } else {
-                            thTol  = data.new_tol;
-                            thCrit = data.new_crit;
-                            alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
-                        }
-                    }).catch(() => {});
-            }, 500);
-        }, 1000);
-    }).catch(() => {
+    function closeOverlay() {
         clearInterval(calTimer);
+        calTimer = null;
         overlay.classList.remove('visible');
         btn.disabled = false;
-        alert('Errore di connessione durante la calibrazione.');
-    });
+    }
+
+    // Timeout di sicurezza: se dopo 20s non arriva nulla sblocca
+    const safetyTimeout = setTimeout(() => {
+        closeOverlay();
+    }, 20000);
+
+    fetch('/calibrate')
+        .then(() => {
+            // Inizia il polling dopo 2s (tempo per avviare la calibrazione)
+            setTimeout(() => {
+                const poll = setInterval(() => {
+                    fetch('/calibrate/result')
+                        .then(r => r.json())
+                        .then(data => {
+                            // Aggiorna dB live nell'overlay
+                            dbLive.innerText = (state_level || '--') + ' dB';
+
+                            if (data.status === 'running' || data.status === 'idle') return;
+                            clearInterval(poll);
+                            clearTimeout(safetyTimeout);
+                            closeOverlay();
+                            if (data.error) {
+                                alert('Errore: ' + data.error);
+                            } else {
+                                thTol  = data.new_tol;
+                                thCrit = data.new_crit;
+                                alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
+                            }
+                        }).catch(() => {});
+                }, 500);
+            }, 2000);
+        })
+        .catch(() => {
+            clearTimeout(safetyTimeout);
+            closeOverlay();
+            alert('Errore di connessione durante la calibrazione.');
+        });
+}
+
+function setComfortMode(mode) {
+    fetch('/set_comfort_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+    }).catch(() => {});
+    document.getElementById('btn-noise').classList.toggle('active', mode === 'white_noise');
+    document.getElementById('btn-file').classList.toggle('active',  mode === 'file');
+    const sel = document.getElementById('audio-file-select');
+    sel.classList.toggle('visible', mode === 'file');
+    if (mode === 'file') loadAudioFiles();
+}
+
+function setAudioFile(filename) {
+    if (!filename) return;
+    fetch('/set_audio_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+    }).catch(() => {});
+}
+
+function loadAudioFiles() {
+    fetch('/audio_files')
+        .then(r => r.json())
+        .then(data => {
+            const sel = document.getElementById('audio-file-select');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">— scegli file —</option>';
+            (data.files || []).forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f; opt.textContent = f;
+                if (f === current) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!data.files || data.files.length === 0) {
+                sel.innerHTML = '<option value="">Nessun file in /audio/</option>';
+            }
+        }).catch(() => {});
 }
 
 function toggle() {
