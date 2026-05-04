@@ -238,7 +238,7 @@
         <div class="audio-block">
             <label>Modalità comfort</label>
             <div class="audio-toggle">
-                <button id="btn-noise" class="active" onclick="setComfortMode('white_noise')">⬜ Rumore</button>
+                <button id="btn-noise" class="active" onclick="setComfortMode('pink_noise')">🌸 Rosa</button>
                 <button id="btn-file"  onclick="setComfortMode('file')">🎵 File</button>
             </div>
             <select id="audio-file-select" onchange="setAudioFile(this.value)">
@@ -474,7 +474,7 @@ function setComfortMode(mode) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode })
     }).catch(() => {});
-    document.getElementById('btn-noise').classList.toggle('active', mode === 'white_noise');
+    document.getElementById('btn-noise').classList.toggle('active', mode === 'pink_noise');
     document.getElementById('btn-file').classList.toggle('active',  mode === 'file');
     const sel = document.getElementById('audio-file-select');
     sel.classList.toggle('visible', mode === 'file');
@@ -554,9 +554,11 @@ function refresh() {
             document.getElementById('th-crit-val').innerText = thCrit + ' dB';
 
             // Stato / modalità
-            if (!data.active) {
+            const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+            if (data.mode === 'IDLE' || (!data.active && data.mode !== 'CALIBRATING')) {
                 currentBg = 'var(--bg-idle)';
-                modeTxt.innerText   = 'SISTEMA IDLE';
+                modeTxt.innerText   = 'IDLE';
                 modeTxt.style.color = '#aaa';
                 modeSub.innerText   = 'Pronto per avvio';
                 timerEl.innerText   = '00:00';
@@ -566,27 +568,32 @@ function refresh() {
                 currentBg = 'var(--bg-idle)';
                 modeTxt.innerText   = 'CALIBRAZIONE';
                 modeTxt.style.color = '#3498db';
-                modeSub.innerText   = 'Ascolto rumore di fondo…';
+                modeSub.innerText   = 'Misuro il rumore di fondo… FFT off';
+                timerEl.innerText   = fmt(data.countdown);
             } else if (data.mode === 'CHECK') {
                 currentBg = 'var(--bg-check)';
-                modeTxt.innerText   = 'ANALISI AMBIENTE';
+                modeTxt.innerText   = 'CHECK';
                 modeTxt.style.color = 'var(--accent-yellow)';
-                modeSub.innerText   = 'Monitoraggio attivo';
+                modeSub.innerText   = data.noise_detected ? '⚠ Rumore rilevato' : 'Ascolto… FFT off';
                 btn.innerText       = 'Ferma';
                 btn.className       = 'btn btn-toggle-on';
-                const m = Math.floor(data.countdown / 60);
-                const s = data.countdown % 60;
-                timerEl.innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                timerEl.innerText   = fmt(data.countdown);
+            } else if (data.mode === 'IDLE_WAIT') {
+                currentBg = 'var(--bg-check)';
+                modeTxt.innerText   = 'ATTESA';
+                modeTxt.style.color = '#aaa';
+                modeSub.innerText   = 'Pausa prima del prossimo CHECK';
+                btn.innerText       = 'Ferma';
+                btn.className       = 'btn btn-toggle-on';
+                timerEl.innerText   = fmt(data.countdown);
             } else if (data.mode === 'COMFORT') {
                 currentBg = 'var(--bg-comfort)';
-                modeTxt.innerText   = 'MODALITÀ COMFORT';
+                modeTxt.innerText   = 'COMFORT';
                 modeTxt.style.color = 'var(--accent-red)';
-                modeSub.innerText   = 'Rumore bianco attivo';
+                modeSub.innerText   = data.comfort_mode === 'file' ? '🎵 File audio' : '🌸 Pink noise';
                 btn.innerText       = 'Ferma';
                 btn.className       = 'btn btn-toggle-on';
-                const m = Math.floor(data.countdown / 60);
-                const s = data.countdown % 60;
-                timerEl.innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                timerEl.innerText   = fmt(data.countdown);
             }
 
             body.style.background = currentBg;
