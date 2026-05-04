@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+
+# Audio temporanei generati a runtime
+/tmp/wn.wav
+/tmp/pn.wav
+
+# Editor
+.vscode/
+.idea/
+*.swp
