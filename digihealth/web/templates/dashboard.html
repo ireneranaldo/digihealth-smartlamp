@@ -444,7 +444,7 @@ function runCalibration() {
                         .then(r => r.json())
                         .then(data => {
                             // Aggiorna dB live nell'overlay
-                            dbLive.innerText = (state_level || '--') + ' dB';
+                            dbLive.innerText = (document.getElementById('db-val').innerText || '--') + ' dB';
 
                             if (data.status === 'running' || data.status === 'idle') return;
                             clearInterval(poll);

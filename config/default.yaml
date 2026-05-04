@@ -14,7 +14,7 @@ sensors:
   microphone:
     enabled: true
     device_index: 1        # Jabra - solo microfono
-    output_device_index: 0 # bcm2835 - casse collegate jac
+    output_device_index: 2 # bcm2835 - casse collegate jac
 #  microphone:
 #    enabled: true  # presente
 #   device_index: null  # Auto-detect

@@ -1,10 +1,5 @@
-import os
-import time
-import threading
-import logging
-import subprocess
+import os, time, threading, logging, subprocess, wave, struct, random
 import numpy as np
-
 from flask import Flask, render_template, jsonify, request
 from ..config import config
 from ..logger import logger
@@ -13,195 +8,265 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 base_dir     = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(base_dir, 'templates')
-# Cartella audio relativa alla root del progetto
-AUDIO_DIR    = os.path.join(os.path.dirname(base_dir), '..', 'audio')
-AUDIO_DIR    = os.path.normpath(AUDIO_DIR)
+AUDIO_DIR    = os.path.normpath(os.path.join(base_dir, '..', '..', 'audio'))
 
 app = Flask(__name__, template_folder=template_dir)
+
+# ---------------------------------------------------------------------------
+# Configurazione
+# ---------------------------------------------------------------------------
+_ac_cfg           = config.processors.audio_comfort
+TEMPO_CHECK_SEC   = int(_ac_cfg.get('check_duration',   10))
+TEMPO_COMFORT_SEC = int(_ac_cfg.get('comfort_duration', 300))
+CALIBRATION_SECS  = 10
+RATE              = 16000
+CHUNK             = 1024
+NUM_BARS          = 48
 
 # ---------------------------------------------------------------------------
 # Stato globale
 # ---------------------------------------------------------------------------
 state = {
-    "active":        False,
-    "mode":          "IDLE",
-    "countdown":     0,
-    "level":         0.0,
-    "th_tol":        45.0,
-    "th_crit":       65.0,
-    "volume":        0.5,
-    "spectrum":      [0] * 48,
-    "needs_comfort": False,
-    "comfort_mode":  "white_noise",   # "white_noise" | "file"
-    "audio_file":    "",              # nome file selezionato
-    "air_quality": {
-        "temp":     "--",
-        "humidity": "--",
-        "co2":      "--",
-        "iaqi":     "--",
-    },
+    "active":       False,
+    "mode":         "IDLE",
+    "countdown":    0,
+    "level":        0.0,
+    "th_tol":       45.0,
+    "th_crit":      65.0,
+    "volume":       0.5,
+    "spectrum":     [0] * NUM_BARS,
+    "comfort_mode": "white_noise",
+    "audio_file":   "",
+    "air_quality":  {"temp": "--", "humidity": "--", "co2": "--", "iaqi": "--"},
 }
 
-_comfort_event = threading.Event()
-_logic_thread  = None
-_mic_sensor    = None
-
-_ac_cfg           = config.processors.audio_comfort
-TEMPO_CHECK_SEC   = int(_ac_cfg.get('check_duration',   10))
-TEMPO_COMFORT_SEC = int(_ac_cfg.get('comfort_duration', 300))
-CALIBRATION_SECS  = 10
-
 # ---------------------------------------------------------------------------
-# Helpers microfono
+# Audio processor — UN SOLO STREAM pyaudio (input+output), come il vecchio codice
 # ---------------------------------------------------------------------------
-def _read_mic():
-    if _mic_sensor is not None:
-        try:
-            return _mic_sensor.read()
-        except Exception as e:
-            logger.warning(f"Errore lettura microfono: {e}")
-    return {"audio_db": 0.0, "audio_spectrum": [0] * 48}
+_audio_thread  = None
+_audio_running = False
+_stream        = None
+_pa            = None
+_mic_sensor    = None   # usato solo per lettura esterna se stream non disponibile
 
-def _update_audio_state():
-    data = _read_mic()
-    state["level"]    = data.get("audio_db", 0.0)
-    state["spectrum"] = data.get("audio_spectrum", [0] * 48)
+# Bande FFT logaritmiche
+def _log_bins(n, rate, chunk):
+    fmin, fmax = 40.0, rate / 2.0 * 0.9
+    edges = np.logspace(np.log10(fmin), np.log10(fmax), n + 1)
+    freqs = np.fft.rfftfreq(chunk, d=1.0 / rate)
+    bins  = []
+    for i in range(n):
+        lo = int(np.searchsorted(freqs, edges[i]))
+        hi = int(np.searchsorted(freqs, edges[i + 1]))
+        hi = max(hi, lo + 1)
+        bins.append((min(lo, len(freqs)-1), min(hi, len(freqs))))
+    return bins
 
-# ---------------------------------------------------------------------------
-# Thread logica CHECK / COMFORT
-# ---------------------------------------------------------------------------
-def _logic_loop():
-    while True:
-        if not state["active"]:
-            time.sleep(0.5)
-            continue
+_BINS = _log_bins(NUM_BARS, RATE, CHUNK)
 
-        state["mode"]          = "CHECK"
-        state["needs_comfort"] = False
-        _comfort_event.clear()
-
-        for i in range(TEMPO_CHECK_SEC, 0, -1):
-            if not state["active"]:
-                state["mode"] = "IDLE"; state["countdown"] = 0; return
-            state["countdown"] = i
-            _update_audio_state()
-            if state["level"] >= state["th_crit"]:
-                state["needs_comfort"] = True
-                _comfort_event.set()
-            time.sleep(1)
-
-        if not state["active"]:
-            continue
-
-        if _comfort_event.is_set():
-            state["mode"] = "COMFORT"
-            # Avvia la sorgente audio scelta
-            if state["comfort_mode"] == "file" and state["audio_file"]:
-                _start_audio_file()
-            else:
-                _start_white_noise_thread()
-
-            for i in range(TEMPO_COMFORT_SEC, 0, -1):
-                if not state["active"]:
-                    _stop_all_audio()
-                    state["mode"] = "IDLE"; state["countdown"] = 0; return
-                state["countdown"] = i
-                _update_audio_state()
-                time.sleep(1)
-
-            _stop_all_audio()
-
-def _start_logic_thread():
-    global _logic_thread
-    if _logic_thread and _logic_thread.is_alive():
-        return
-    _logic_thread = threading.Thread(target=_logic_loop, daemon=True)
-    _logic_thread.start()
-
-# ---------------------------------------------------------------------------
-# Rumore bianco
-# ---------------------------------------------------------------------------
-_noise_running = False
-_noise_thread  = None
-
-def _white_noise_loop():
-    global _noise_running
+def _audio_loop(device_index):
+    """
+    Thread unico: legge microfono e scrive rumore bianco sullo stesso stream.
+    Durante COMFORT con file audio, scrive silenzio (casse gestite da mpg123).
+    """
+    global _audio_running, _stream, _pa
     try:
         import pyaudio
-        p = pyaudio.PyAudio()
-        CHUNK = 1024
-        out_idx = config.sensors.microphone.get('output_device_index', None)
-        kw = dict(format=pyaudio.paInt16, channels=1, rate=16000,
-                  output=True, frames_per_buffer=CHUNK)
-        if out_idx is not None:
-            kw['output_device_index'] = int(out_idx)
-        stream = p.open(**kw)
-        logger.info("Rumore bianco avviato")
-        while _noise_running and state["active"]:
-            amp   = 0.08 * state["volume"]
-            noise = np.random.uniform(-amp, amp, CHUNK)
-            stream.write((noise * 32767).astype(np.int16).tobytes())
-        stream.stop_stream(); stream.close(); p.terminate()
-        logger.info("Rumore bianco fermato")
+        _pa = pyaudio.PyAudio()
+        kw  = dict(format=pyaudio.paInt16, channels=1, rate=RATE,
+                   input=True, output=False, frames_per_buffer=CHUNK)
+        if device_index is not None:
+            kw['input_device_index'] = int(device_index)
+        _stream = _pa.open(**kw)
+        logger.info(f"Stream audio aperto (device={device_index}, rate={RATE})")
     except Exception as e:
-        logger.error(f"Errore rumore bianco: {e}")
-
-def _start_white_noise_thread():
-    global _noise_thread, _noise_running
-    if _noise_thread and _noise_thread.is_alive():
+        logger.error(f"Impossibile aprire stream audio: {e}")
+        _audio_running = False
         return
-    _noise_running = True
-    _noise_thread  = threading.Thread(target=_white_noise_loop, daemon=True)
-    _noise_thread.start()
 
-def _stop_white_noise():
-    global _noise_running
-    _noise_running = False
+    while _audio_running:
+        try:
+            # 1. Leggi microfono
+            raw  = _stream.read(CHUNK, exception_on_overflow=False)
+            data = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
 
-# ---------------------------------------------------------------------------
-# Riproduzione file audio (mpg123 in loop)
-# ---------------------------------------------------------------------------
-_audio_process = None
+            # 2. Calcola dB
+            rms = np.sqrt(np.mean(data ** 2))
+            db  = float(20 * np.log10(rms / 32768.0) + 95) if rms > 0 else 0.0
+            state["level"] = round(max(0.0, db), 1)
 
-def _start_audio_file():
-    global _audio_process
-    _stop_audio_file()
-    filename = state.get("audio_file", "")
-    if not filename:
-        return
-    filepath = os.path.join(AUDIO_DIR, filename)
-    if not os.path.isfile(filepath):
-        logger.error(f"File audio non trovato: {filepath}")
-        return
+            # 3. FFT spettro
+            fft_mag  = np.abs(np.fft.rfft(data * np.hanning(len(data))))
+            spectrum = []
+            for lo, hi in _BINS:
+                val = float(np.mean(fft_mag[lo:hi]))
+                val = 0.0 if (np.isnan(val) or np.isinf(val)) else val
+                spectrum.append(min(100, int(val / 400)))
+            state["spectrum"] = spectrum
+
+            # Output audio gestito da aplay/mpg123 — nessuna scrittura su stream
+
+        except Exception as e:
+            logger.warning(f"Audio loop: {e}")
+            time.sleep(0.05)
+
+    # cleanup
     try:
-        # mpg123 --loop -1 = loop infinito
-        # -q = quiet (nessun output su stdout)
-        cmd = ["mpg123", "-q", "--loop", "-1", filepath]
-        _audio_process = subprocess.Popen(cmd)
-        logger.info(f"File audio avviato: {filename}")
-    except FileNotFoundError:
-        # mpg123 non installato, fallback su aplay per WAV o omxplayer
-        try:
-            cmd = ["cvlc", "--loop", "--quiet", filepath]
-            _audio_process = subprocess.Popen(cmd)
-            logger.info(f"File audio avviato con vlc: {filename}")
-        except Exception as e2:
-            logger.error(f"Impossibile riprodurre audio: {e2}")
+        _stream.stop_stream()
+        _stream.close()
+        _pa.terminate()
+        logger.info("Stream audio chiuso")
+    except Exception:
+        pass
 
-def _stop_audio_file():
-    global _audio_process
-    if _audio_process and _audio_process.poll() is None:
-        _audio_process.terminate()
+def _start_audio_thread(device_index=None):
+    global _audio_thread, _audio_running
+    if _audio_thread and _audio_thread.is_alive():
+        return
+    _audio_running = True
+    _audio_thread  = threading.Thread(
+        target=_audio_loop, args=(device_index,), daemon=True, name="AudioLoop"
+    )
+    _audio_thread.start()
+
+# ---------------------------------------------------------------------------
+# File audio (mpg123) — solo per comfort_mode == "file"
+# ---------------------------------------------------------------------------
+_file_proc = None
+_file_lock = threading.Lock()
+
+def _make_white_noise_wav():
+    """Genera /tmp/wn.wav una volta sola — 10s rumore bianco 16kHz mono."""
+    path = '/tmp/wn.wav'
+    if os.path.isfile(path):
+        return path
+    rate, dur = 16000, 10
+    amp = int(32767 * 0.20)
+    samples = [random.randint(-amp, amp) for _ in range(rate * dur)]
+    with wave.open(path, 'w') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(struct.pack(f'<{len(samples)}h', *samples))
+    logger.info("File rumore bianco generato: /tmp/wn.wav")
+    return path
+
+def _start_file_audio():
+    global _file_proc
+    with _file_lock:
+        _stop_file_audio_unsafe()
+        fn = state.get("audio_file", "")
+        fp = os.path.join(AUDIO_DIR, fn)
+        if not fn or not os.path.isfile(fp):
+            logger.error(f"File audio non trovato: {fp}")
+            return
+        for cmd in [["mpg123", "-q", "--loop", "-1", fp],
+                    ["cvlc", "--loop", "--quiet", fp]]:
+            try:
+                _file_proc = subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+                logger.info(f"File audio avviato: {fn}")
+                return
+            except FileNotFoundError:
+                continue
+        logger.error("mpg123/vlc non trovati — installa: sudo apt install mpg123")
+
+def _start_white_noise():
+    global _file_proc
+    with _file_lock:
+        _stop_file_audio_unsafe()
+        wav = _make_white_noise_wav()
+        # aplay con loop infinito tramite script bash
+        cmd = ["bash", "-c", f"while true; do aplay -q {wav}; done"]
         try:
-            _audio_process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            _audio_process.kill()
-        _audio_process = None
+            _file_proc = subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+            logger.info("Rumore bianco avviato (aplay loop)")
+        except Exception as e:
+            logger.error(f"Impossibile avviare rumore bianco: {e}")
+
+def _stop_file_audio_unsafe():
+    global _file_proc
+    if _file_proc and _file_proc.poll() is None:
+        _file_proc.terminate()
+        try: _file_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired: _file_proc.kill()
+        _file_proc = None
         logger.info("File audio fermato")
 
-def _stop_all_audio():
-    _stop_white_noise()
-    _stop_audio_file()
+def _stop_file_audio():
+    with _file_lock:
+        _stop_file_audio_unsafe()
+
+# ---------------------------------------------------------------------------
+# Loop logica CHECK → COMFORT (stesso schema del vecchio codice)
+# ---------------------------------------------------------------------------
+_logic_thread    = None
+_logic_stop_flag = threading.Event()
+
+def _logic_loop():
+    logger.info(f"Logic loop START — check={TEMPO_CHECK_SEC}s comfort={TEMPO_COMFORT_SEC}s")
+
+    while not _logic_stop_flag.is_set():
+
+        # ===== CHECK =====
+        state["mode"]   = "CHECK"
+        needs_comfort   = False
+
+        for i in range(TEMPO_CHECK_SEC, 0, -1):
+            if _logic_stop_flag.is_set(): break
+            state["countdown"] = i
+            if state["level"] >= state["th_crit"]:
+                needs_comfort = True
+            time.sleep(1)
+
+        if _logic_stop_flag.is_set(): break
+
+        if not needs_comfort:
+            logger.info("CHECK: sotto soglia → riparto")
+            continue
+
+        # ===== COMFORT =====
+        logger.info(f"COMFORT avviato ({state['comfort_mode']}) per {TEMPO_COMFORT_SEC}s")
+        state["mode"] = "COMFORT"
+
+        # Se file audio → avvia mpg123
+        if state["comfort_mode"] == "file":
+            _start_file_audio()
+
+        for i in range(TEMPO_COMFORT_SEC, 0, -1):
+            if _logic_stop_flag.is_set(): break
+            state["countdown"] = i
+            time.sleep(1)
+
+        # Ferma file audio se attivo
+        if state["comfort_mode"] == "file":
+            _stop_file_audio()
+
+        if _logic_stop_flag.is_set(): break
+
+        logger.info("COMFORT terminato → torno CHECK")
+
+    # cleanup
+    _stop_file_audio()
+    state["mode"]      = "IDLE"
+    state["countdown"] = 0
+    state["active"]    = False
+    logger.info("Logic loop STOP")
+
+def _start_logic():
+    global _logic_thread
+    _logic_stop_flag.clear()
+    if _logic_thread and _logic_thread.is_alive():
+        _logic_stop_flag.set()
+        _logic_thread.join(timeout=5)
+        _logic_stop_flag.clear()
+    _logic_thread = threading.Thread(
+        target=_logic_loop, daemon=True, name="LogicLoop"
+    )
+    _logic_thread.start()
+
+def _stop_logic():
+    _logic_stop_flag.set()
+    _stop_file_audio()
 
 # ---------------------------------------------------------------------------
 # Route Flask
@@ -212,26 +277,21 @@ def index():
 
 @app.route('/status')
 def get_status():
-    _update_audio_state()
     return jsonify(state)
 
 @app.route('/toggle')
 def toggle():
-    state["active"] = not state["active"]
-    if state["active"]:
-        state["mode"] = "CHECK"
-        state["needs_comfort"] = False
-        _comfort_event.clear()
-        _start_logic_thread()
-        logger.info("AudioComfort ON")
+    if not state["active"]:
+        state["active"] = True
+        _start_logic()
+        logger.info("▶ AVVIATO")
     else:
-        state["mode"] = "IDLE"
-        state["countdown"] = 0
-        _stop_all_audio()
-        logger.info("AudioComfort OFF")
+        state["active"] = False
+        _stop_logic()
+        logger.info("■ FERMATO")
     return jsonify({"status": "ok", "active": state["active"]})
 
-# --- Calibrazione asincrona ---
+# ---- Calibrazione asincrona ----
 _cal_result = {"status": "idle"}
 
 @app.route('/calibrate')
@@ -239,95 +299,89 @@ def calibrate():
     global _cal_result
     _cal_result = {"status": "running"}
 
-    def _do_calibrate():
+    def _do():
         global _cal_result
         was_active = state["active"]
-        state["active"] = False
-        _stop_all_audio()
-        state["mode"] = "CALIBRATING"
+        if was_active:
+            state["active"] = False
+            _stop_logic()
+            time.sleep(0.5)
 
-        db_samples = []
-        deadline = time.time() + CALIBRATION_SECS
-        while time.time() < deadline:
-            data = _read_mic()
-            db = data.get("audio_db", 0.0)
+        state["mode"] = "CALIBRATING"
+        samples = []
+        t_end   = time.time() + CALIBRATION_SECS
+        while time.time() < t_end:
+            db = state["level"]
             if db > 0:
-                db_samples.append(db)
+                samples.append(db)
             time.sleep(0.1)
 
         state["mode"] = "IDLE"
 
-        if not db_samples:
-            _cal_result = {"error": "Nessun dato audio. Verifica il microfono."}
+        if not samples:
+            _cal_result = {"error": "Nessun dato audio ricevuto."}
             return
 
-        arr      = np.array(db_samples, dtype=float)
+        arr      = np.array(samples)
         avg      = float(np.mean(arr))
         std      = float(np.std(arr))
         new_tol  = round(avg + std * 1.5, 1)
         new_crit = round(avg + std * 3.0, 1)
         state["th_tol"]  = new_tol
         state["th_crit"] = new_crit
+        logger.info(f"Calibrazione OK: avg={avg:.1f} tol={new_tol} crit={new_crit}")
 
         if was_active:
             state["active"] = True
-            state["mode"]   = "CHECK"
-            _start_logic_thread()
+            _start_logic()
 
         _cal_result = {"status": "ok", "avg": round(avg, 1),
                        "new_tol": new_tol, "new_crit": new_crit}
 
-    threading.Thread(target=_do_calibrate, daemon=True).start()
+    threading.Thread(target=_do, daemon=True).start()
     return jsonify({"status": "started"})
 
 @app.route('/calibrate/result')
 def calibrate_result():
     return jsonify(_cal_result)
 
-# --- Impostazioni comfort ---
 @app.route('/set_comfort_mode', methods=['POST'])
 def set_comfort_mode():
-    data = request.get_json(silent=True) or {}
-    mode = data.get('mode', 'white_noise')
-    if mode in ('white_noise', 'file'):
-        state["comfort_mode"] = mode
-        return jsonify({"status": "ok", "comfort_mode": mode})
+    d = request.get_json(silent=True) or {}
+    m = d.get('mode', 'white_noise')
+    if m in ('white_noise', 'file'):
+        state["comfort_mode"] = m
+        return jsonify({"status": "ok"})
     return jsonify({"status": "error"}), 400
 
 @app.route('/set_audio_file', methods=['POST'])
 def set_audio_file():
-    data = request.get_json(silent=True) or {}
-    filename = data.get('filename', '')
-    filepath = os.path.join(AUDIO_DIR, filename)
-    if filename and os.path.isfile(filepath):
-        state["audio_file"] = filename
-        return jsonify({"status": "ok", "audio_file": filename})
+    d  = request.get_json(silent=True) or {}
+    fn = d.get('filename', '')
+    fp = os.path.join(AUDIO_DIR, fn)
+    if fn and os.path.isfile(fp):
+        state["audio_file"] = fn
+        return jsonify({"status": "ok"})
     return jsonify({"status": "error", "message": "File non trovato"}), 404
 
 @app.route('/audio_files')
 def audio_files():
-    """Restituisce la lista dei file MP3/WAV nella cartella audio."""
     os.makedirs(AUDIO_DIR, exist_ok=True)
-    files = [
-        f for f in os.listdir(AUDIO_DIR)
-        if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac'))
-    ]
-    files.sort()
+    files = sorted([f for f in os.listdir(AUDIO_DIR)
+                    if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac'))])
     return jsonify({"files": files})
 
 @app.route('/set_volume', methods=['POST', 'GET'])
 def set_volume():
+    vol = None
     if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        vol  = data.get('volume')
+        vol = (request.get_json(silent=True) or {}).get('volume')
     else:
         vol = request.args.get('volume', type=float)
-    if vol is None:
-        vol = request.args.get('level', type=float)
     if vol is not None:
         state["volume"] = max(0.0, min(1.0, float(vol)))
         return jsonify({"status": "ok", "volume": state["volume"]})
-    return jsonify({"status": "error", "message": "Parametro 'volume' mancante"}), 400
+    return jsonify({"status": "error"}), 400
 
 @app.route('/shutdown_kiosk')
 def shutdown_kiosk():
@@ -359,23 +413,14 @@ class WebManager:
                 "iaqi":     processed_data.get('IAQI', '--'),
             }
         except Exception as e:
-            logger.error(f"Errore aggiornamento dati web: {e}")
+            logger.error(f"update_data: {e}")
 
     def run(self):
         os.makedirs(AUDIO_DIR, exist_ok=True)
         mic_cfg = config.sensors.microphone
         if mic_cfg.get('enabled', False):
-            try:
-                from ..sensors.microphone import MicrophoneSensor
-                mic = MicrophoneSensor(mic_cfg)
-                if mic.is_available():
-                    mic.start()
-                    self.set_mic_sensor(mic)
-                    logger.info("MicrophoneSensor avviato")
-                else:
-                    logger.warning("MicrophoneSensor: dispositivo non trovato")
-            except Exception as e:
-                logger.error(f"Impossibile avviare MicrophoneSensor: {e}")
+            dev_idx = mic_cfg.get('device_index', None)
+            _start_audio_thread(device_index=dev_idx)
 
-        app.run(host=self.host, port=self.port, debug=False,
-                use_reloader=False, threaded=True)
+        app.run(host=self.host, port=self.port,
+                debug=False, use_reloader=False, threaded=True)
