@@ -1,4 +1,5 @@
 import os, time, threading, logging, subprocess, wave, re, signal
+from datetime import datetime
 import numpy as np
 from flask import Flask, render_template, jsonify, request
 from ..config import config
@@ -344,6 +345,11 @@ def audio_processor():
                 logger.info("COMFORT terminato → CHECK")
                 state["noise_detected"] = False
                 state["mode"]           = "CHECK"
+
+        # ── Auto-stop alle 18:00 ──────────────────────────────────────────
+        if state["active"] and datetime.now().hour >= 18:
+            logger.info("Auto-stop: orario 18:00 superato")
+            state["active"] = False
 
         # ── Stop forzato dall'utente (preme "Ferma") ──────────────────────
         if not state["active"] and mode not in ("IDLE", "CALIBRATING"):
