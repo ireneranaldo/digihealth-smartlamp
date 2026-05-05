@@ -269,8 +269,15 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
                 spectrum = []
                 for lo, hi in _BINS:
                     val = float(np.mean(fft_mag[lo:hi]))
-                    val = 0.0 if np.isnan(val) or np.isinf(val) else val
-                    spectrum.append(min(100, int(val / 400)))
+                    if np.isnan(val) or np.isinf(val) or val < 1e-10:
+                        spectrum.append(0)
+                        continue
+                    # Scala log dB: range [-70, 0] dB → [0, 100]
+                    # Funziona a qualsiasi guadagno di microfono
+                    ref  = CHUNK * 32768.0
+                    db   = 20.0 * np.log10(val / ref)
+                    bar  = int((db + 70.0) / 70.0 * 100.0)
+                    spectrum.append(max(0, min(100, bar)))
         except Exception:
             pass
 
