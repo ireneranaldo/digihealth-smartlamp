@@ -49,4 +49,10 @@ def load_config(config_path: str = "config/default.yaml") -> DigiHealthConfig:
     else:
         return DigiHealthConfig()
 
-config = load_config()
+import platform as _platform
+_default_cfg = (
+    "config/windows.yaml"
+    if _platform.system() == "Windows"
+    else "config/default.yaml"
+)
+config = load_config(os.environ.get('DIGIHEALTH_CONFIG', _default_cfg))

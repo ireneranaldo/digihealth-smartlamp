@@ -1,0 +1,38 @@
+sensors:
+  zph:
+    enabled: false
+  light:
+    enabled: false
+  microphone:
+    enabled: true
+    device_index: null          # auto-detect PC mic
+    output_device_index: null   # default PC output
+
+processors:
+  audio_comfort:
+    enabled: true
+    check_duration: 10
+    comfort_duration: 300
+    tolerance_threshold: 45.0
+    critical_threshold: 55.0
+
+actuators:
+  neopixel:
+    enabled: false
+  shelly:
+    enabled: false
+
+communicator:
+  telegraf:
+    enabled: false
+  ipc:
+    method: "sqlite"
+    db_path: "/tmp/digihealth.db"
+
+web:
+  enabled: true
+  host: "127.0.0.1"
+  port: 5000
+
+logging:
+  level: "INFO"
