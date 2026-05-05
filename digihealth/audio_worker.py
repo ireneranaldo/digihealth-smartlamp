@@ -12,7 +12,7 @@ Pacchetti in uscita (data_q) ogni ~100ms:
    "th_tol", "th_crit", "noise_detected", "fft_active",
    "comfort_mode", "cal_done"}
 """
-import os, time, threading, subprocess, wave, re, signal
+import os, time, threading, subprocess, wave, re, signal, tempfile
 import queue as _q
 from datetime import datetime
 import numpy as np
@@ -21,6 +21,7 @@ import numpy as np
 RATE     = 16000
 CHUNK    = 1024
 NUM_BARS = 48
+PINK_WAV = os.path.join(tempfile.gettempdir(), 'pink.wav')  # /tmp su Linux, %TEMP% su Windows
 
 
 def _log_bins(n, rate, chunk):
@@ -46,9 +47,10 @@ _output_alsa = None
 
 # ── Pink Noise 1/f via NumPy ──────────────────────────────────────────────────
 def _generate_pink_noise_wav():
-    path = '/tmp/pink.wav'
+    path = PINK_WAV
     if os.path.isfile(path):
         return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     n     = RATE * 10
     white = np.random.randn(n)
     fft_w = np.fft.rfft(white)
@@ -244,7 +246,7 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
             if last_mode == "COMFORT":
                 _stop_audio_output()
             if mode == "COMFORT":
-                comfort_file = '/tmp/pink.wav'
+                comfort_file = PINK_WAV
                 if comfort_mode == "file" and audio_file:
                     fp = os.path.join(audio_dir, audio_file)
                     if os.path.isfile(fp):
@@ -325,7 +327,7 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
         if mode == "COMFORT" and last_mode == "COMFORT":
             if _file_proc is None or _file_proc.poll() is not None:
                 log.warning("Watchdog: audio morto, riavvio")
-                comfort_file = '/tmp/pink.wav'
+                comfort_file = PINK_WAV
                 if comfort_mode == "file" and audio_file:
                     fp = os.path.join(audio_dir, audio_file)
                     if os.path.isfile(fp):
