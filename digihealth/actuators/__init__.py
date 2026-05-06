@@ -12,9 +12,12 @@ class ActuatorManager:
     def _load_actuators(self):
         """Load available actuators."""
         if config.actuators.neopixel.get('enabled', True):
-            from .neopixel_controller import NeoPixelController
-            self.actuators.append(NeoPixelController(config.actuators.neopixel))
-            logger.info("NeoPixel actuator loaded")
+            try:
+                from .neopixel_controller import NeoPixelController
+                self.actuators.append(NeoPixelController(config.actuators.neopixel))
+                logger.info("NeoPixel actuator loaded")
+            except Exception as e:
+                logger.warning(f"NeoPixel actuator not available: {e}")
 
     def update(self, data: Dict[str, Any]):
         """Update actuators based on sensor data."""
