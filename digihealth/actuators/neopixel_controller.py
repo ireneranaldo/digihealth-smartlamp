@@ -1,7 +1,6 @@
 import time
 import datetime
 import math
-import json
 import board
 import neopixel
 from typing import Dict, Any
@@ -32,7 +31,6 @@ class NeoPixelController:
         try:
             iaqi = data.get('IAQI', 0)
             lux = data.get('lux-IntensitaLuminosa', 0)
-            people = 0 #self._read_person_count()
 
             # Check time constraints
             if not self._is_active_time():
@@ -49,22 +47,10 @@ class NeoPixelController:
             rgb = self._kelvin_to_rgb(temp_k)
             self._set_circadian_segment(rgb, brightness)
 
-            # People indicator
-            self._set_people_leds(people)
-
             self.pixels.show()
 
         except Exception as e:
             logger.error(f"Error updating NeoPixel: {e}")
-
-    def _read_person_count(self) -> int:
-        """Read person count from file."""
-        try:
-            with open("/home/digip/people_to_leds.json", "r") as f:
-                data = json.load(f)
-                return data.get("person_count", 0)
-        except:
-            return 0
 
     def _is_active_time(self) -> bool:
         """Check if current time is within active hours."""
@@ -130,17 +116,3 @@ class NeoPixelController:
                 int(b * factor)
             )
 
-    def _set_people_leds(self, people: int):
-        """Set LEDs based on person count."""
-        violet = (180, 0, 255)
-        brightness = 0.2
-        r_v, g_v, b_v = violet
-        violet_soft = (
-            int(r_v * brightness),
-            int(g_v * brightness),
-            int(b_v * brightness)
-        )
-
-        leds_to_light = min(people, self.circadian_range[1] - self.circadian_range[0] + 1)
-        for i in range(self.circadian_range[0], self.circadian_range[0] + leds_to_light):
-            self.pixels[i] = violet_soft

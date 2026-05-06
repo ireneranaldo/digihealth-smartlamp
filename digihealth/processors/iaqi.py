@@ -1,4 +1,6 @@
 from typing import Dict, Any, List
+import logging
+log = logging.getLogger("digihealth")
 
 class IAQIProcessor:
     """Processes IAQI (Indoor Air Quality Index) calculations."""
@@ -54,6 +56,7 @@ class IAQIProcessor:
         iaq_no2 = self._calculate_sub_index(no2, self.NO2_BREAKPOINTS)
 
         iAQI = int(max(iaq_pm25, iaq_co2, iaq_ch2o, iaq_no2))
+        log.debug(f"IAQI={iAQI} PM2.5={pm25:.1f}({iaq_pm25:.0f}) CO2={co2:.0f}({iaq_co2:.0f}) CH2O={ch2o:.3f}({iaq_ch2o:.0f}) NO2={no2:.3f}({iaq_no2:.0f})")
 
         data["IAQI"] = iAQI
 
@@ -69,6 +72,8 @@ class IAQIProcessor:
 
     def _calculate_sub_index(self, C: float, breakpoints: List[Dict[str, float]]) -> float:
         """Calculate sub-index for a pollutant."""
+        if C < breakpoints[0]["C_lo"]:
+            return 0
         for bp in breakpoints:
             if bp["C_lo"] <= C <= bp["C_hi"]:
                 return ((bp["I_hi"] - bp["I_lo"]) / (bp["C_hi"] - bp["C_lo"])) * (C - bp["C_lo"]) + bp["I_lo"]
