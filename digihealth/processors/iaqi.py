@@ -55,8 +55,9 @@ class IAQIProcessor:
         iaq_ch2o = self._calculate_sub_index(ch2o, self.CH2O_BREAKPOINTS)
         iaq_no2 = self._calculate_sub_index(no2, self.NO2_BREAKPOINTS)
 
-        iAQI = int(max(iaq_pm25, iaq_co2, iaq_ch2o, iaq_no2))
-        log.debug(f"IAQI={iAQI} PM2.5={pm25:.1f}({iaq_pm25:.0f}) CO2={co2:.0f}({iaq_co2:.0f}) CH2O={ch2o:.3f}({iaq_ch2o:.0f}) NO2={no2:.3f}({iaq_no2:.0f})")
+        # NO2 escluso: il ZPHS01B non misura NO2, quei byte restituiscono valori non validi (~10 ppm)
+        iAQI = int(max(iaq_pm25, iaq_co2, iaq_ch2o))
+        log.debug(f"IAQI={iAQI} PM2.5={pm25:.1f}({iaq_pm25:.0f}) CO2={co2:.0f}({iaq_co2:.0f}) CH2O={ch2o:.3f}({iaq_ch2o:.0f})")
 
         data["IAQI"] = iAQI
 
