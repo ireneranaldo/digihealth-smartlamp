@@ -18,7 +18,7 @@ from datetime import datetime
 import numpy as np
 
 # ── Costanti audio ────────────────────────────────────────────────────────────
-RATE       = 16000
+RATE       = 44100
 CHUNK      = 1024
 NUM_BARS   = 48
 PINK_WAV   = os.path.join(tempfile.gettempdir(), 'pink.wav')
