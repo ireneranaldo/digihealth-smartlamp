@@ -12,16 +12,17 @@ Pacchetti in uscita (data_q) ogni ~100ms:
    "th_tol", "th_crit", "noise_detected", "fft_active",
    "comfort_mode", "cal_done"}
 """
-import os, time, threading, subprocess, wave, re, signal, tempfile
+import os, sys, time, threading, subprocess, wave, re, signal, tempfile
 import queue as _q
 from datetime import datetime
 import numpy as np
 
 # ── Costanti audio ────────────────────────────────────────────────────────────
-RATE     = 16000
-CHUNK    = 1024
-NUM_BARS = 48
-PINK_WAV = os.path.join(tempfile.gettempdir(), 'pink.wav')  # /tmp su Linux, %TEMP% su Windows
+RATE       = 16000
+CHUNK      = 1024
+NUM_BARS   = 48
+PINK_WAV   = os.path.join(tempfile.gettempdir(), 'pink.wav')
+IS_WINDOWS = sys.platform == 'win32'
 
 
 def _log_bins(n, rate, chunk):
@@ -84,21 +85,52 @@ def _mpg123_cmd(filepath, volume=0.5):
     return cmd
 
 
+def _win_loop_wav_cmd(filepath):
+    escaped = filepath.replace("'", "''")
+    ps = f"while ($true) {{ (New-Object Media.SoundPlayer '{escaped}').PlaySync() }}"
+    return ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps]
+
+
+def _win_loop_mp3_cmds(filepath, volume=0.5):
+    vol = int(32768 * volume)
+    abs_path = os.path.abspath(filepath).replace("\\", "/")
+    ps_media = (
+        "Add-Type -AssemblyName PresentationCore; "
+        "$mp = [Windows.Media.MediaPlayer]::new(); "
+        f"$mp.Open([Uri]::new('{abs_path}')); "
+        "$mp.Play(); "
+        "while ($true) { "
+        "  Start-Sleep -Milliseconds 200; "
+        "  if ($mp.NaturalDuration.HasTimeSpan -and "
+        "      $mp.Position -ge $mp.NaturalDuration.TimeSpan) { "
+        "    $mp.Position = [TimeSpan]::Zero; $mp.Play() } }"
+    )
+    return [
+        ["mpg123", "-q", "--loop", "-1", "-f", str(vol), filepath],
+        ["vlc", "--intf", "dummy", "--repeat", "--no-video", filepath],
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_media],
+    ]
+
+
 def _start_audio_output(filepath, volume=0.5):
     global _file_proc
     with _file_lock:
         _stop_audio_output_unsafe()
         if not os.path.isfile(filepath):
             return
-        ext  = os.path.splitext(filepath)[1].lower()
-        # WAV → aplay bash-loop (mpg123 non fa loop affidabile su WAV)
-        # MP3 → mpg123 prima, poi aplay come fallback
-        cmds = [_aplay_loop_cmd(filepath)] if ext == '.wav' \
-               else [_mpg123_cmd(filepath, volume), _aplay_loop_cmd(filepath)]
+        ext = os.path.splitext(filepath)[1].lower()
+        if IS_WINDOWS:
+            cmds = [_win_loop_wav_cmd(filepath)] if ext == '.wav' \
+                   else _win_loop_mp3_cmds(filepath, volume)
+        else:
+            cmds = [_aplay_loop_cmd(filepath)] if ext == '.wav' \
+                   else [_mpg123_cmd(filepath, volume), _aplay_loop_cmd(filepath)]
+        kw = dict(stderr=subprocess.DEVNULL)
+        if not IS_WINDOWS:
+            kw['start_new_session'] = True
         for cmd in cmds:
             try:
-                _file_proc = subprocess.Popen(
-                    cmd, stderr=subprocess.DEVNULL, start_new_session=True)
+                _file_proc = subprocess.Popen(cmd, **kw)
                 return
             except FileNotFoundError:
                 continue
@@ -108,14 +140,20 @@ def _stop_audio_output_unsafe():
     global _file_proc
     if _file_proc and _file_proc.poll() is None:
         try:
-            os.killpg(os.getpgid(_file_proc.pid), signal.SIGTERM)
+            if hasattr(os, 'killpg'):
+                os.killpg(os.getpgid(_file_proc.pid), signal.SIGTERM)
+            else:
+                _file_proc.terminate()
         except (ProcessLookupError, PermissionError, OSError):
             _file_proc.terminate()
         try:
             _file_proc.wait(timeout=3)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(_file_proc.pid), signal.SIGKILL)
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(_file_proc.pid), signal.SIGKILL)
+                else:
+                    _file_proc.kill()
             except Exception:
                 _file_proc.kill()
     _file_proc = None
@@ -212,7 +250,7 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
 
     try:
         _generate_pink_noise_wav()
-        log.info("Pink noise pronto: /tmp/pink.wav")
+        log.info(f"Pink noise pronto: {PINK_WAV}")
     except Exception as e:
         log.warning(f"Pink noise fallito: {e}")
 
@@ -269,14 +307,12 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
                 spectrum = []
                 for lo, hi in _BINS:
                     val = float(np.mean(fft_mag[lo:hi]))
-                    if np.isnan(val) or np.isinf(val) or val < 1e-10:
+                    if np.isnan(val) or np.isinf(val) or val < 1.0:
                         spectrum.append(0)
                         continue
-                    # Scala log dB: range [-70, 0] dB → [0, 100]
-                    # Funziona a qualsiasi guadagno di microfono
-                    ref  = CHUNK * 32768.0
-                    db   = 20.0 * np.log10(val / ref)
-                    bar  = int((db + 70.0) / 70.0 * 100.0)
+                    # 20-100 dB assoluto → [0, 100]: funziona per qualsiasi mic
+                    band_db = 20.0 * np.log10(val)
+                    bar     = int((band_db - 20.0) / 80.0 * 100.0)
                     spectrum.append(max(0, min(100, bar)))
         except Exception:
             pass

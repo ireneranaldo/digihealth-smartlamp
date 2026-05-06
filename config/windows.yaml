@@ -5,8 +5,8 @@ sensors:
     enabled: false
   microphone:
     enabled: true
-    device_index: null          # auto-detect PC mic
-    output_device_index: null   # default PC output
+    device_index: 1          # auto-detect PC mic
+    output_device_index: 2   # default PC output
 
 processors:
   audio_comfort:
@@ -27,7 +27,7 @@ communicator:
     enabled: false
   ipc:
     method: "sqlite"
-    db_path: "/tmp/digihealth.db"
+    db_path: null
 
 web:
   enabled: true

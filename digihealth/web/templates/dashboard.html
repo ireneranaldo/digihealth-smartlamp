@@ -169,6 +169,73 @@
         #label-tol  { color: rgba(216,164,127,0.8); }
         #label-crit { color: rgba(228,149,113,0.9); }
 
+        /* ---- COMFORT OVERLAY ---- */
+        #comfort-overlay {
+            display: none;
+            position: absolute; inset: 0;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 14px;
+            background: linear-gradient(135deg, rgba(202,142,123,0.18), rgba(228,149,113,0.12));
+            border-radius: 16px;
+        }
+        #comfort-overlay.visible { display: flex; }
+        .comfort-icon {
+            font-size: 3.5rem;
+            animation: float 3s ease-in-out infinite;
+        }
+        .comfort-title {
+            font-size: 1.5rem; font-weight: bold;
+            color: var(--accent-zen); letter-spacing: 3px;
+        }
+        .comfort-sub { font-size: 0.88rem; color: rgba(77,60,47,0.55); }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-8px); }
+        }
+
+        /* ---- dB live in IDLE (overlay sullo spettro) ---- */
+        #db-idle-display {
+            display: none;
+            position: absolute; top: 10px; right: 16px;
+            flex-direction: column; align-items: flex-end;
+            pointer-events: none;
+        }
+        #db-idle-display.visible { display: flex; }
+        #db-idle-val {
+            font-size: 3rem; font-weight: bold; font-family: monospace;
+            color: rgba(77,60,47,0.75); line-height: 1;
+        }
+        #db-idle-unit { font-size: 0.8rem; color: rgba(77,60,47,0.4); }
+
+        /* ---- CHECK OVERLAY (full-screen) ---- */
+        #check-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(248,228,198,0.92);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 16px;
+        }
+        #check-overlay.visible { display: flex; }
+        #check-title { font-size: 1.5rem; font-weight: bold; color: var(--accent-yellow); letter-spacing: 2px; }
+        #check-ring-wrap { position: relative; width: 100px; height: 100px; }
+        #check-ring {
+            width: 100px; height: 100px;
+            border: 6px solid rgba(216,164,127,0.2);
+            border-top-color: var(--accent-yellow);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        #check-secs {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; font-weight: bold; font-family: monospace;
+        }
+        #check-db-live { font-size: 2.2rem; font-weight: bold; }
+        #check-hint { font-size: 0.85rem; color: #aaa; }
+
         /* ---- CALIBRATING OVERLAY ---- */
         #cal-overlay {
             display: none;
@@ -202,6 +269,17 @@
     </style>
 </head>
 <body id="main-body">
+
+<!-- CHECK OVERLAY -->
+<div id="check-overlay">
+    <div id="check-title">CHECK RUMORE</div>
+    <div id="check-ring-wrap">
+        <div id="check-ring"></div>
+        <div id="check-secs">10</div>
+    </div>
+    <div id="check-db-live">-- dB</div>
+    <div id="check-hint">Sto ascoltando… resta in silenzio se vuoi</div>
+</div>
 
 <!-- CALIBRATION OVERLAY -->
 <div id="cal-overlay">
@@ -274,6 +352,15 @@
         <div id="spectrum-overlay">SPETTRO FREQUENZE</div>
         <div id="label-tol">tol</div>
         <div id="label-crit">crit</div>
+        <div id="comfort-overlay">
+            <div class="comfort-icon">🌸</div>
+            <div class="comfort-title">MODALITÀ COMFORT</div>
+            <div class="comfort-sub" id="comfort-sub-text">Rumore rosa in riproduzione</div>
+        </div>
+        <div id="db-idle-display">
+            <div id="db-idle-val">0.0</div>
+            <div id="db-idle-unit">dB SPL</div>
+        </div>
     </div>
 
 </div>
@@ -609,8 +696,37 @@ function refresh() {
             // Volume slider sync
             document.getElementById('volume-slider').value = data.volume;
 
-            // Aggiorna spettro canvas
-            drawSpectrum(data.spectrum || []);
+            // ── Overlay CHECK ──────────────────────────────────────────
+            const checkEl   = document.getElementById('check-overlay');
+            const isCheck   = data.mode === 'CHECK';
+            checkEl.classList.toggle('visible', isCheck);
+            if (isCheck) {
+                document.getElementById('check-secs').innerText  = data.countdown;
+                document.getElementById('check-db-live').innerText = db.toFixed(1) + ' dB';
+            }
+
+            // ── Spettro: canvas / overlay COMFORT / dB IDLE ────────────
+            const comfortEl = document.getElementById('comfort-overlay');
+            const dbIdleEl  = document.getElementById('db-idle-display');
+            const isComfort = data.mode === 'COMFORT';
+            const isIdle    = data.mode === 'IDLE' || (!data.active && data.mode !== 'CALIBRATING' && data.mode !== 'CHECK');
+
+            if (isComfort) {
+                canvas.style.display = 'none';
+                document.getElementById('spectrum-overlay').style.display = 'none';
+                comfortEl.classList.add('visible');
+                dbIdleEl.classList.remove('visible');
+                document.getElementById('comfort-sub-text').innerText =
+                    data.comfort_mode === 'file' ? '🎵 File audio in riproduzione' : '🌸 Rumore rosa in riproduzione';
+            } else {
+                canvas.style.display = 'block';
+                document.getElementById('spectrum-overlay').style.display = 'block';
+                comfortEl.classList.remove('visible');
+                // dB numerico sovrapposto allo spettro solo in IDLE
+                dbIdleEl.classList.toggle('visible', isIdle);
+                if (isIdle) document.getElementById('db-idle-val').innerText = db.toFixed(1);
+                drawSpectrum(data.spectrum || []);
+            }
 
             // Qualità aria
             if (data.air_quality) {
