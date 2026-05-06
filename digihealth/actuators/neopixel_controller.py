@@ -57,7 +57,7 @@ class NeoPixelController:
         now = datetime.datetime.now()
         current_minutes = now.hour * 60 + now.minute
         start_minutes = 8 * 60 + 10  # 08:10
-        end_minutes = 17 * 60  # 18:00
+        end_minutes = 18 * 60 + 40  # 18:40
         return start_minutes <= current_minutes < end_minutes
 
     def _get_iaqi_color(self, iaqi: int) -> tuple:
