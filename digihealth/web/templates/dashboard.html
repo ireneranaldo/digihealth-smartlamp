@@ -33,15 +33,23 @@
 
         /* ---- TOP PANEL ---- */
         .top-panel {
-            display: grid;
-            grid-template-columns: 1.2fr 0.9fr 0.9fr 1.4fr 0.8fr 0.6fr 0.6fr;
-            gap: 8px;
+            display: flex; flex-direction: column; gap: 10px;
             background: linear-gradient(140deg, #fdf0e0, #f5dcc4);
             box-shadow: 0 8px 20px var(--panel-shadow);
             padding: 12px 16px;
             border-radius: 20px;
-            align-items: center;
             border: 1px solid rgba(208,170,132,0.4);
+        }
+        .top-row {
+            display: grid;
+            grid-template-columns: 1.2fr 0.9fr 1fr 1.6fr 0.8fr;
+            gap: 8px; align-items: center;
+        }
+        .btn-row {
+            display: flex; justify-content: center; align-items: center;
+            gap: 12px;
+            padding-top: 2px;
+            border-top: 1px solid rgba(208,170,132,0.3);
         }
         .mode-block { display: flex; flex-direction: column; gap: 2px; }
         #mode-text  { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
@@ -59,8 +67,8 @@
         #th-crit-val { color: var(--accent-red); }
 
         .btn {
-            padding: 11px 16px;
-            font-size: 0.95rem; font-weight: 700;
+            padding: 7px 12px;
+            font-size: 0.75rem; font-weight: 700;
             border-radius: 999px;
             border: 2px solid rgba(255,255,255,0.2);
             cursor: pointer;
@@ -79,7 +87,7 @@
             background: rgba(255,255,255,0.18);
             color: rgba(97,76,67,0.85);
             border: 1px solid rgba(123,85,72,0.25);
-            font-size: 0.78rem; padding: 8px 10px;
+            font-size: 0.68rem; padding: 5px 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             opacity: 0.55;
         }
@@ -236,6 +244,45 @@
         #check-db-live { font-size: 2.2rem; font-weight: bold; }
         #check-hint { font-size: 0.85rem; color: #aaa; }
 
+        /* ---- RESULT MODAL (calibrazione completata) ---- */
+        #result-modal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(60,36,20,0.45);
+            z-index: 200;
+            align-items: center; justify-content: center;
+        }
+        #result-modal.visible { display: flex; }
+        .modal-box {
+            background: #fdf0e0;
+            border-radius: 24px;
+            padding: 36px 48px 28px;
+            box-shadow: 0 20px 60px rgba(60,36,20,0.4);
+            display: flex; flex-direction: column; align-items: center; gap: 28px;
+            min-width: 320px;
+            border: 1px solid rgba(208,170,132,0.6);
+        }
+        .modal-title {
+            font-size: 0.85rem; font-weight: 600; letter-spacing: 2px;
+            color: rgba(77,60,47,0.5); text-transform: uppercase;
+        }
+        .modal-rows { width: 100%; display: flex; flex-direction: column; gap: 20px; }
+        .modal-row { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .modal-row .label { font-size: 0.72rem; color: rgba(77,60,47,0.45); text-transform: uppercase; letter-spacing: 1px; }
+        .modal-row .value { font-weight: 800; font-size: 2.2rem; font-family: monospace; line-height: 1; }
+        .modal-divider { width: 100%; height: 1px; background: rgba(208,170,132,0.35); }
+        .modal-ok {
+            padding: 11px 48px;
+            background: var(--accent-zen); color: white;
+            border: none; border-radius: 999px;
+            font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            transition: transform 0.12s, box-shadow 0.12s;
+        }
+        .modal-ok:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.26); }
+        .modal-ok:active { transform: translateY(0); }
+
         /* ---- CALIBRATING OVERLAY ---- */
         #cal-overlay {
             display: none;
@@ -281,6 +328,30 @@
     <div id="check-hint">Sto ascoltando… resta in silenzio se vuoi</div>
 </div>
 
+<!-- RESULT MODAL -->
+<div id="result-modal">
+    <div class="modal-box">
+        <div class="modal-title">Calibrazione completata</div>
+        <div class="modal-rows">
+            <div class="modal-row">
+                <span class="label">Rumore di fondo</span>
+                <span class="value" id="res-avg" style="color:var(--text-light)">--</span>
+            </div>
+            <div class="modal-divider"></div>
+            <div class="modal-row">
+                <span class="label">Soglia comfort</span>
+                <span class="value" id="res-tol" style="color:var(--accent-yellow)">--</span>
+            </div>
+            <div class="modal-divider"></div>
+            <div class="modal-row">
+                <span class="label">Soglia critica</span>
+                <span class="value" id="res-crit" style="color:var(--accent-red)">--</span>
+            </div>
+        </div>
+        <button class="modal-ok" onclick="closeResultModal()">OK</button>
+    </div>
+</div>
+
 <!-- CALIBRATION OVERLAY -->
 <div id="cal-overlay">
     <div id="cal-title">CALIBRAZIONE IN CORSO</div>
@@ -296,40 +367,47 @@
 
     <!-- TOP PANEL -->
     <div class="top-panel">
-        <div class="mode-block">
-            <div id="mode-text">IDLE</div>
-            <div id="mode-sub">Sistema fermo</div>
-        </div>
 
-        <div class="db-block">
-            <div id="db-display"><span id="db-val">0</span><span class="unit"> dB</span></div>
-        </div>
-
-        <div class="threshold-block">
-            <div class="th-row"><span class="th-label">Soglia comfort</span><span class="th-val" id="th-tol-val">45 dB</span></div>
-            <div class="th-row"><span class="th-label">Soglia critica</span><span class="th-val" id="th-crit-val">65 dB</span></div>
-        </div>
-
-        <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
-        <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
-
-        <div class="audio-block">
-            <label>Modalità comfort</label>
-            <div class="audio-toggle">
-                <button id="btn-noise" class="active" onclick="setComfortMode('pink_noise')">🌸 Rosa</button>
-                <button id="btn-file"  onclick="setComfortMode('file')">🎵 File</button>
+        <!-- riga info -->
+        <div class="top-row">
+            <div class="mode-block">
+                <div id="mode-text">IDLE</div>
+                <div id="mode-sub">Sistema fermo</div>
             </div>
-            <select id="audio-file-select" onchange="setAudioFile(this.value)">
-                <option value="">— scegli file —</option>
-            </select>
+
+            <div class="db-block">
+                <div id="db-display"><span id="db-val">0</span><span class="unit"> dB</span></div>
+            </div>
+
+            <div class="threshold-block">
+                <div class="th-row"><span class="th-label">Soglia comfort</span><span class="th-val" id="th-tol-val">45 dB</span></div>
+                <div class="th-row"><span class="th-label">Soglia critica</span><span class="th-val" id="th-crit-val">65 dB</span></div>
+            </div>
+
+            <div class="audio-block">
+                <label>Modalità comfort</label>
+                <div class="audio-toggle">
+                    <button id="btn-noise" class="active" onclick="setComfortMode('pink_noise')">🌸 Rosa</button>
+                    <button id="btn-file"  onclick="setComfortMode('file')">🎵 File</button>
+                </div>
+                <select id="audio-file-select" onchange="setAudioFile(this.value)">
+                    <option value="">— scegli file —</option>
+                </select>
+            </div>
+
+            <div class="volume-block">
+                <label for="volume-slider">Volume</label>
+                <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.05" value="0.5">
+            </div>
         </div>
 
-        <div class="volume-block">
-            <label for="volume-slider">Volume</label>
-            <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.05" value="0.5">
+        <!-- riga bottoni -->
+        <div class="btn-row">
+            <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
+            <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
+            <button class="btn btn-exit" onclick="exitApp()">Esci</button>
         </div>
 
-        <button class="btn btn-exit" onclick="exitApp()">Esci</button>
     </div>
 
     <!-- METER -->
@@ -538,11 +616,11 @@ function runCalibration() {
                             clearTimeout(safetyTimeout);
                             closeOverlay();
                             if (data.error) {
-                                alert('Errore: ' + data.error);
+                                showResultModal(null, null, null, data.error);
                             } else {
                                 thTol  = data.new_tol;
                                 thCrit = data.new_crit;
-                                alert(`Calibrazione completata!\nRumore di fondo: ${data.avg} dB\nSoglia comfort: ${data.new_tol} dB\nSoglia critica: ${data.new_crit} dB`);
+                                showResultModal(data.avg, data.new_tol, data.new_crit, null);
                             }
                         }).catch(() => {});
                 }, 500);
@@ -610,6 +688,26 @@ document.getElementById('volume-slider').addEventListener('input', function () {
 
 function exitApp() {
     fetch('/shutdown_kiosk').catch(() => {});
+}
+
+function showResultModal(avg, tol, crit, error) {
+    const modal = document.getElementById('result-modal');
+    if (error) {
+        document.querySelector('.modal-title').innerText = '⚠ Calibrazione fallita';
+        document.getElementById('res-avg').innerText  = error;
+        document.getElementById('res-tol').innerText  = '--';
+        document.getElementById('res-crit').innerText = '--';
+    } else {
+        document.querySelector('.modal-title').innerText = '✓ Calibrazione completata';
+        document.getElementById('res-avg').innerText  = avg  + ' dB';
+        document.getElementById('res-tol').innerText  = tol  + ' dB';
+        document.getElementById('res-crit').innerText = crit + ' dB';
+    }
+    modal.classList.add('visible');
+}
+
+function closeResultModal() {
+    document.getElementById('result-modal').classList.remove('visible');
 }
 
 // -----------------------------------------------------------------------

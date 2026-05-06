@@ -41,9 +41,10 @@ def _log_bins(n, rate, chunk):
 _BINS = _log_bins(NUM_BARS, RATE, CHUNK)
 
 # ── Globals del sottoprocesso (non condivisi col processo principale) ─────────
-_file_proc   = None
-_file_lock   = threading.Lock()
-_output_alsa = None
+_file_proc    = None
+_file_lock    = threading.Lock()
+_output_alsa  = None
+_winsound_on  = False   # True quando winsound sta suonando (solo Windows WAV)
 
 
 # ── Pink Noise 1/f via NumPy ──────────────────────────────────────────────────
@@ -85,10 +86,26 @@ def _mpg123_cmd(filepath, volume=0.5):
     return cmd
 
 
-def _win_loop_wav_cmd(filepath):
-    escaped = filepath.replace("'", "''")
-    ps = f"while ($true) {{ (New-Object Media.SoundPlayer '{escaped}').PlaySync() }}"
-    return ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps]
+def _start_wav_windows(filepath):
+    """WAV su Windows: winsound asincrono in loop — nessun subprocess, muore col processo."""
+    global _winsound_on
+    import winsound
+    winsound.PlaySound(
+        filepath,
+        winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC
+    )
+    _winsound_on = True
+
+
+def _stop_wav_windows():
+    global _winsound_on
+    if _winsound_on:
+        try:
+            import winsound
+            winsound.PlaySound(None, winsound.SND_PURGE)
+        except Exception:
+            pass
+        _winsound_on = False
 
 
 def _win_loop_mp3_cmds(filepath, volume=0.5):
@@ -119,9 +136,11 @@ def _start_audio_output(filepath, volume=0.5):
         if not os.path.isfile(filepath):
             return
         ext = os.path.splitext(filepath)[1].lower()
+        if IS_WINDOWS and ext == '.wav':
+            _start_wav_windows(filepath)   # thread Python, nessun subprocess
+            return
         if IS_WINDOWS:
-            cmds = [_win_loop_wav_cmd(filepath)] if ext == '.wav' \
-                   else _win_loop_mp3_cmds(filepath, volume)
+            cmds = _win_loop_mp3_cmds(filepath, volume)
         else:
             cmds = [_aplay_loop_cmd(filepath)] if ext == '.wav' \
                    else [_mpg123_cmd(filepath, volume), _aplay_loop_cmd(filepath)]
@@ -138,24 +157,38 @@ def _start_audio_output(filepath, volume=0.5):
 
 def _stop_audio_output_unsafe():
     global _file_proc
+    _stop_wav_windows()  # ferma winsound se attivo
     if _file_proc and _file_proc.poll() is None:
-        try:
-            if hasattr(os, 'killpg'):
-                os.killpg(os.getpgid(_file_proc.pid), signal.SIGTERM)
-            else:
-                _file_proc.terminate()
-        except (ProcessLookupError, PermissionError, OSError):
-            _file_proc.terminate()
-        try:
-            _file_proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
+        if IS_WINDOWS:
+            # taskkill /F /T uccide il processo e tutti i suoi figli
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(_file_proc.pid)],
+                    capture_output=True, timeout=5
+                )
+            except Exception:
+                try:
+                    _file_proc.kill()
+                except Exception:
+                    pass
+        else:
             try:
                 if hasattr(os, 'killpg'):
-                    os.killpg(os.getpgid(_file_proc.pid), signal.SIGKILL)
+                    os.killpg(os.getpgid(_file_proc.pid), signal.SIGTERM)
                 else:
+                    _file_proc.terminate()
+            except (ProcessLookupError, PermissionError, OSError):
+                _file_proc.terminate()
+            try:
+                _file_proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                try:
+                    if hasattr(os, 'killpg'):
+                        os.killpg(os.getpgid(_file_proc.pid), signal.SIGKILL)
+                    else:
+                        _file_proc.kill()
+                except Exception:
                     _file_proc.kill()
-            except Exception:
-                _file_proc.kill()
     _file_proc = None
 
 
@@ -247,6 +280,21 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
         log.error(f"Errore apertura microfono: {e}")
         pa.terminate()
         return
+
+    import atexit
+    def _cleanup():
+        log.info("AudioWorker cleanup: stop audio + chiusura stream")
+        _stop_audio_output()
+        try:
+            in_stream.stop_stream()
+            in_stream.close()
+        except Exception:
+            pass
+        try:
+            pa.terminate()
+        except Exception:
+            pass
+    atexit.register(_cleanup)
 
     try:
         _generate_pink_noise_wav()
@@ -389,8 +437,8 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
             noise_det = False
             countdown = 0
 
-        # 7. Invia pacchetto status ogni ~100ms
-        if now - last_send >= 0.1:
+        # 7. Invia pacchetto status ogni ~100ms (o subito se c'è cal_done)
+        if now - last_send >= 0.1 or cal_done is not None:
             try:
                 data_q.put_nowait({
                     "db":             db,
@@ -408,3 +456,4 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
             except _q.Full:
                 pass
             last_send = now
+
