@@ -1,14 +1,27 @@
+# Web dashboard
 Flask==3.0.0
+
+# Analisi audio e calcoli numerici
 numpy==1.26.0
 PyAudio==0.2.14
+
+# Hardware Raspberry Pi
 RPi.GPIO
 board
 neopixel
 adafruit-blinka
 smbus2
 pyserial
+
+# HTTP (es. Shelly lamp)
 requests
-telegraf-pyplug
+
+# InfluxDB
+influxdb-client
+
+# Configurazione
 pydantic
 pyyaml
+
+# Test
 pytest
