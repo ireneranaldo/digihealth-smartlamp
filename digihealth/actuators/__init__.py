@@ -19,6 +19,14 @@ class ActuatorManager:
             except Exception as e:
                 logger.warning(f"NeoPixel actuator not available: {e}")
 
+        if config.actuators.shelly.get('enabled', False):
+            try:
+                from .shelly_controller import ShellyController
+                self.actuators.append(ShellyController(config.actuators.shelly))
+                logger.info("Shelly actuator loaded")
+            except Exception as e:
+                logger.warning(f"Shelly actuator not available: {e}")
+
     def update(self, data: Dict[str, Any]):
         """Update actuators based on sensor data."""
         for actuator in self.actuators:

@@ -21,6 +21,7 @@ actuators:
     enabled: false
   shelly:
     enabled: false
+    devices: []
 
 communicator:
   telegraf:
