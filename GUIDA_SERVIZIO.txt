@@ -11,6 +11,8 @@ Cosa fa il servizio:
   2. Riavvia lo script automaticamente in caso di errore (dopo 5s)
   3. Invia costantemente i dati a InfluxDB via influxdb-client
   4. Aggiorna la striscia NeoPixel e la dashboard web
+  5. Controlla le lampadine Shelly (luce circadiana + dimming adattivo)
+  6. Controlla il purificatore PNI PTA200 (Tuya) in base a PM2.5/CO2
 
 Percorsi:
   Cartella progetto:  /home/digip/digihealth-lamp
@@ -120,7 +122,51 @@ Dopo aver modificato config/default.yaml:
   sudo systemctl restart digihealth-lamp.service
 
 -----------------------------------------------------
-7. SALVATAGGIO MODIFICHE CON GIT
+7. ATTIVARE LE LAMPADINE SHELLY
+-----------------------------------------------------
+
+Le Shelly sono disabilitate di default. Per attivarle:
+
+  1. Apri config/default.yaml
+  2. Imposta shelly.enabled: true
+  3. Aggiungi o modifica i dispositivi nella lista devices:
+       devices:
+         - name: "Lampada1 Uff Sensorizzato"
+           ip: "192.168.1.191"
+           enabled: true
+  4. Riavvia il servizio:
+       sudo systemctl restart digihealth-lamp.service
+
+Per aggiungere altre Shelly, aggiungi un blocco sotto devices.
+Solo quelle con enabled: true verranno comandate.
+
+Logica circadiana:
+  07:00-15:59 → luce fredda (6500K)
+  16:00-06:59 → luce calda (2700K)
+  Luminosità:  adattiva in base al lux del sensore BH1750
+
+-----------------------------------------------------
+8. ATTIVARE IL PURIFICATORE TUYA (PNI PTA200)
+-----------------------------------------------------
+
+Il purificatore è disabilitato di default. Per attivarlo:
+
+  1. Apri config/default.yaml
+  2. Imposta tuya_purifier.enabled: true
+  3. Verifica device_id, ip e local_key
+  4. Riavvia il servizio:
+       sudo systemctl restart digihealth-lamp.service
+
+Logica di controllo:
+  PM2.5 > 25 µg/m³  OPPURE  CO2 > 800 ppm → purificatore ACCESO
+  Entrambi nei limiti → purificatore SPENTO
+  Il comando viene inviato solo quando lo stato deve cambiare.
+
+Se cambia l'IP del purificatore (es. dopo riavvio router), aggiorna
+ip in config/default.yaml e riavvia il servizio.
+
+-----------------------------------------------------
+9. SALVATAGGIO MODIFICHE CON GIT
 -----------------------------------------------------
 
 Dopo ogni modifica importante al codice o alla configurazione,

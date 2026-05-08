@@ -11,6 +11,8 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 | **Sensori** | ZPH01B (PM1/PM2.5/PM10, CO2, TVOC, CH2O, temperatura, umidità) via UART; BH1750 (lux) via I2C; microfono USB |
 | **IAQI** | Calcolo Indice di Qualità dell'Aria Interna secondo breakpoint standard (PM2.5, CO2, TVOC, CH2O) |
 | **NeoPixel** | Striscia 144 LED: pixel 0–79 visualizzano IAQI con effetto breathing, pixel 80–143 simulano la luce circadiana |
+| **Shelly** | Lampadine smart via HTTP API: luce circadiana (6500K giorno / 2700K sera) e dimming adattivo in base al lux |
+| **Purificatore Tuya** | PNI PTA200 via Tuya local API: accensione automatica se PM2.5 > 25 µg/m³ o CO2 > 800 ppm |
 | **Audio comfort** | Monitoraggio livello sonoro, calibrazione automatica, riproduzione pink noise o file audio se la soglia viene superata |
 | **Dashboard web** | Flask su porta 5000: grafici FFT in tempo reale, livello dB, qualità dell'aria, controllo volume e modalità |
 | **InfluxDB** | Invio diretto a InfluxDB Cloud via `influxdb-client` (measurement `ZPHSensor_sensore`) |
@@ -120,6 +122,22 @@ actuators:
     iaqi_range: [0, 79]         # pixel per IAQI
     circadian_range: [80, 143]  # pixel per luce circadiana
 
+  shelly:
+    enabled: true               # false per disabilitare
+    devices:
+      - name: "Lampada1 Uff Sensorizzato"
+        ip: "192.168.1.191"
+        enabled: true
+      # aggiungere altre Shelly con lo stesso formato
+
+  tuya_purifier:
+    enabled: false              # true per attivare
+    device_id: "..."            # ID dispositivo Tuya
+    ip: "192.168.0.108"
+    local_key: "..."            # chiave locale Tuya
+    pm25_limit: 25              # µg/m³ sopra cui si accende
+    co2_limit: 800              # ppm sopra cui si accende
+
 communicator:
   telegraf:
     measurement: "ZPHSensor_sensore"
@@ -188,7 +206,9 @@ digihealth-lamp/
 │   │   ├── iaqi.py              # Calcolo IAQI
 │   │   └── audio_comfort.py     # State machine comfort acustico
 │   ├── actuators/
-│   │   └── neopixel_controller.py  # Controllo striscia LED
+│   │   ├── neopixel_controller.py  # Controllo striscia LED
+│   │   ├── shelly_controller.py    # Lampadine Shelly via HTTP API
+│   │   └── tuya_purifier.py        # Purificatore PNI PTA200 via Tuya
 │   ├── communicator/
 │   │   └── telegraf_client.py   # Invio dati a InfluxDB
 │   └── web/
@@ -218,10 +238,12 @@ digihealth-lamp/
 ZPH01B (UART) ──┐
 BH1750  (I2C) ──┤→ SensorManager → ProcessorManager (IAQI, AudioComfort)
 Microfono USB ──┘                          │
-                              ┌────────────┼─────────────┐
-                              ↓            ↓             ↓
-                         InfluxDB     NeoPixel LED    Dashboard
-                         (Cloud)      (GPIO 12)       (Flask :5000)
+                        ┌──────────────────┼──────────────────┬──────────────┐
+                        ↓                  ↓                  ↓              ↓
+                   InfluxDB          NeoPixel LED         Dashboard      Attuatori
+                   (Cloud)           (GPIO 12)         (Flask :5000)   rete locale
+                                                                        ├ Shelly HTTP
+                                                                        └ Tuya (purif.)
 ```
 
 ---
@@ -236,6 +258,9 @@ Microfono USB ──┘                          │
 | Microfono non trovato | Verificare `device_index` con `arecord -l`; usare `null` per auto-detect |
 | Dashboard non raggiungibile | Verificare che `web.enabled: true` in config e che la porta 5000 sia aperta |
 | InfluxDB: errore autenticazione | Verificare token e URL in `communicator/telegraf_client.py` |
+| Shelly offline nel log | La Shelly non è raggiungibile in rete; verificare IP in config e che sia sulla stessa rete WiFi |
+| Tuya: `Connection refused` | Verificare IP e `local_key`; il dispositivo Tuya deve essere sulla LAN locale |
+| Tuya: `key` errata | Riottenere la `local_key` con `tinytuya wizard` o dall'app Smart Life |
 
 ---
 
