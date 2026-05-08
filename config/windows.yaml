@@ -21,7 +21,10 @@ actuators:
     enabled: false
   shelly:
     enabled: false
-    devices: []
+    devices:
+      - name: "Lampada1 Uff Sensorizzato"
+        ip: "192.168.1.191"
+        enabled: true
 
 communicator:
   telegraf:
