@@ -37,11 +37,11 @@ actuators:
     iaqi_range: [0, 79]
     circadian_range: [80, 143]
   shelly:
-    enabled: false
+    enabled: true
     # Aggiungere qui tutte le Shelly presenti in rete.
     # Solo quelle con enabled: true verranno comandate.
     devices:
-      - name: "Lampada Scrivania"
+      - name: "Lampada1 Uff Sensorizzato"
         ip: "192.168.1.191"
         enabled: true
       # - name: "Lampada Comodino"
