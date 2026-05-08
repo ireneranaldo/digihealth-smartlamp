@@ -27,6 +27,14 @@ class ActuatorManager:
             except Exception as e:
                 logger.warning(f"Shelly actuator not available: {e}")
 
+        if config.actuators.tuya_purifier.get('enabled', False):
+            try:
+                from .tuya_purifier import TuyaPurifier
+                self.actuators.append(TuyaPurifier(config.actuators.tuya_purifier))
+                logger.info("Tuya purifier actuator loaded")
+            except Exception as e:
+                logger.warning(f"Tuya purifier actuator not available: {e}")
+
     def update(self, data: Dict[str, Any]):
         """Update actuators based on sensor data."""
         for actuator in self.actuators:

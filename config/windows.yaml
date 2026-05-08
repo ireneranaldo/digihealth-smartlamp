@@ -25,6 +25,13 @@ actuators:
       - name: "Lampada1 Uff Sensorizzato"
         ip: "192.168.1.191"
         enabled: true
+  tuya_purifier:
+    enabled: false
+    device_id: "30604337807d3a7f7eda"
+    ip: "192.168.0.108"
+    local_key: "EB/FoSq??wzH?xML"
+    pm25_limit: 25
+    co2_limit: 800
 
 communicator:
   telegraf:

@@ -16,6 +16,9 @@ pyserial
 # HTTP (es. Shelly lamp)
 requests
 
+# Tuya local API (purificatore PNI PTA200)
+tinytuya
+
 # InfluxDB
 influxdb-client
 
