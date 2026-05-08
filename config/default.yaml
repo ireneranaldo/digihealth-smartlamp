@@ -14,10 +14,8 @@ sensors:
   microphone:
     enabled: true
     device_index: 1        # USB PnP Sound Device (hw:4,0)
-    output_device_index: 0 # bcm2835 Headphones - jack output (hw:2,0)
-#  microphone:
-#    enabled: true  # presente
-#   device_index: null  # Auto-detect
+    output_device_index: 1 # bcm2835 Headphones - jack output (hw:2,0)
+
 
 processors:
   iaqi:
