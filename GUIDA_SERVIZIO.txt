@@ -13,6 +13,7 @@ Cosa fa il servizio:
   4. Aggiorna la striscia NeoPixel e la dashboard web
   5. Controlla le lampadine Shelly (luce circadiana + dimming adattivo)
   6. Controlla il purificatore PNI PTA200 (Tuya) in base a PM2.5/CO2
+  7. Controlla il climatizzatore Solight DAC-12000 (Tuya) in base alla temperatura
 
 Percorsi:
   Cartella progetto:  /home/digip/digihealth-lamp
@@ -51,6 +52,10 @@ Fermare il servizio:
 Riavviare (es. dopo modifiche al codice o alla config):
   sudo systemctl restart digihealth-lamp.service
 
+ALTERNATIVA WEB: dalla pagina http://<ip>:5000/config
+  clicca il bottone "Riavvia" — l'app si riavvia automaticamente
+  e la pagina si ricarica da sola entro pochi secondi.
+
 -----------------------------------------------------
 3. AVVIO AUTOMATICO AL BOOT
 -----------------------------------------------------
@@ -71,7 +76,7 @@ Verificare se è abilitato:
 Seguire i log mentre il servizio è attivo (CTRL+C per uscire):
   sudo journalctl -u digihealth-lamp.service -f
 
-Ultimi 100 log (senza seguire in tempo reale):
+Ultimi 100 log:
   sudo journalctl -u digihealth-lamp.service -n 100
 
 Log dall'ultimo avvio del sistema:
@@ -83,9 +88,6 @@ Log con timestamp precisi:
 -----------------------------------------------------
 5. ESECUZIONE MANUALE PER DEBUG
 -----------------------------------------------------
-
-Se vuoi vedere l'output direttamente nel terminale
-senza usare il servizio systemd:
 
   1. Ferma il servizio se è attivo:
        sudo systemctl stop digihealth-lamp.service
@@ -102,7 +104,24 @@ senza usare il servizio systemd:
   Usa CTRL+C per fermarlo. NON usare CTRL+Z (lascia processi zombie).
 
 -----------------------------------------------------
-6. INSTALLAZIONE / AGGIORNAMENTO DEL SERVIZIO
+6. CONFIGURAZIONE VIA WEB (CONSIGLIATO)
+-----------------------------------------------------
+
+Apri http://<ip-raspberry>:5000/config nel browser.
+
+Dalla pagina di configurazione puoi:
+  - Abilitare/disabilitare ogni attuatore con un toggle
+  - Modificare IP, local_key, soglie di tutti i dispositivi
+  - Modificare le soglie audio, impostazioni web, log level
+
+Pulsanti:
+  [Salva]    → scrive il file YAML su disco
+  [Riavvia]  → riavvia l'applicazione e ricarica la pagina automaticamente
+
+NOTA: le modifiche sono attive solo dopo il riavvio.
+
+-----------------------------------------------------
+7. INSTALLAZIONE / AGGIORNAMENTO DEL SERVIZIO
 -----------------------------------------------------
 
 Prima installazione:
@@ -118,59 +137,107 @@ Dopo aver modificato il file .service:
 Dopo aver modificato il codice Python:
   sudo systemctl restart digihealth-lamp.service
 
-Dopo aver modificato config/default.yaml:
+Dopo aver modificato config/default.yaml (o dalla pagina web):
   sudo systemctl restart digihealth-lamp.service
+  (oppure clicca "Riavvia" nella pagina /config)
 
 -----------------------------------------------------
-7. ATTIVARE LE LAMPADINE SHELLY
+8. ATTIVARE LE LAMPADINE SHELLY
 -----------------------------------------------------
 
-Le Shelly sono disabilitate di default. Per attivarle:
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Shelly" attiva il toggle
+  3. Verifica l'IP del dispositivo
+  4. Clicca Salva → Riavvia
 
+Via file (alternativa):
   1. Apri config/default.yaml
   2. Imposta shelly.enabled: true
-  3. Aggiungi o modifica i dispositivi nella lista devices:
-       devices:
-         - name: "Lampada1 Uff Sensorizzato"
-           ip: "192.168.1.191"
-           enabled: true
-  4. Riavvia il servizio:
-       sudo systemctl restart digihealth-lamp.service
-
-Per aggiungere altre Shelly, aggiungi un blocco sotto devices.
-Solo quelle con enabled: true verranno comandate.
+  3. Aggiungi/modifica i dispositivi nella lista devices
+  4. Riavvia il servizio
 
 Logica circadiana:
   07:00-15:59 → luce fredda (6500K)
   16:00-06:59 → luce calda (2700K)
   Luminosità:  adattiva in base al lux del sensore BH1750
 
+La dashboard mostra la lampadina con il colore reale (caldo/freddo)
+e l'intensità del glow in base alla brightness corrente.
+
 -----------------------------------------------------
-8. ATTIVARE IL PURIFICATORE TUYA (PNI PTA200)
+9. ATTIVARE IL PURIFICATORE TUYA (PNI PTA200)
 -----------------------------------------------------
 
-Il purificatore è disabilitato di default. Per attivarlo:
-
-  1. Apri config/default.yaml
-  2. Imposta tuya_purifier.enabled: true
-  3. Verifica device_id, ip e local_key
-  4. Riavvia il servizio:
-       sudo systemctl restart digihealth-lamp.service
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Tuya Purificatore" attiva il toggle
+  3. Verifica IP e local_key
+  4. Clicca Salva → Riavvia
 
 Logica di controllo:
-  PM2.5 > 25 µg/m³  OPPURE  CO2 > 800 ppm → purificatore ACCESO
-  Entrambi nei limiti → purificatore SPENTO
-  Il comando viene inviato solo quando lo stato deve cambiare.
+  PM2.5 > 25 µg/m³  OPPURE  CO2 > 800 ppm → ACCESO
+  Entrambi nei limiti → SPENTO
+  Protocollo Tuya: v3.3
 
-Se cambia l'IP del purificatore (es. dopo riavvio router), aggiorna
-ip in config/default.yaml e riavvia il servizio.
+Trovare IP e local_key:
+  python -m tinytuya scan
 
 -----------------------------------------------------
-9. SALVATAGGIO MODIFICHE CON GIT
+10. ATTIVARE IL CLIMATIZZATORE TUYA (SOLIGHT DAC-12000)
 -----------------------------------------------------
 
-Dopo ogni modifica importante al codice o alla configurazione,
-salva il lavoro con questi tre comandi:
+Dispositivo: Solight DAC-12000 / Portable AC-WBR3
+  Device ID:   bf189345591dfac26ehvvj
+  IP locale:   192.168.0.127
+  Protocollo:  Tuya v3.4
+
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Tuya Climatizzatore" attiva il toggle
+  3. Verifica IP e local_key
+  4. Imposta le soglie di temperatura
+  5. Clicca Salva → Riavvia
+
+Logica di controllo (isteresi):
+  temp > temp_on  (default 26°C) → AC ACCESO in modalità freddo
+  temp < temp_off (default 24°C) → AC SPENTO
+  Temperatura target: 22°C (impostata sull'AC all'accensione)
+
+Mappa DPS verificata sul dispositivo:
+  DPS 1  → power (bool)
+  DPS 2  → temperatura impostata (int, °C)
+  DPS 3  → temperatura attuale letta dall'AC (int, °C)
+  DPS 5  → velocità ventola (low/middle/high/auto)
+  DPS 19 → modalità (c=freddo, h=caldo, d=deumidifica, f=ventola, a=auto)
+
+Test rapido del dispositivo:
+  python -c "
+  import tinytuya
+  d = tinytuya.OutletDevice('bf189345591dfac26ehvvj', '192.168.0.127', 'v;-khIaItEN[+-v:')
+  d.set_version(3.4)
+  print(d.status())
+  "
+
+-----------------------------------------------------
+11. DASHBOARD WEB — STATO ATTUATORI
+-----------------------------------------------------
+
+La dashboard (http://<ip>:5000) mostra in tempo reale
+una riga con lo stato di ogni attuatore abilitato:
+
+  NeoPixel      → pallino colorato con il colore IAQI corrente
+  Shelly 💡     → lampadina con glow caldo/freddo e percentuale
+  Purificatore 🌀 → ON/OFF, ultimo valore PM2.5 e CO2
+  Climatizzatore ❄️ → ON/OFF, temperatura ambiente rilevata
+
+I widget appaiono solo per gli attuatori con enabled: true.
+
+-----------------------------------------------------
+12. SALVATAGGIO MODIFICHE CON GIT
+-----------------------------------------------------
+
+Dopo ogni modifica importante al codice o alla configurazione:
 
   git add .
   git commit -m "Descrizione breve della modifica"
@@ -178,7 +245,7 @@ salva il lavoro con questi tre comandi:
 
 Esempio di messaggi di commit utili:
   "Fix soglia audio comfort a 45 dB"
-  "Aggiorna IAQI: escludi NO2 dal calcolo"
-  "Estendi orario NeoPixel fino alle 18:40"
+  "Aggiorna soglie AC: on=27 off=25"
+  "Abilita purificatore Tuya in produzione"
 
 =====================================================

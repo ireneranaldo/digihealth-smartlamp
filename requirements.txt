@@ -1,11 +1,17 @@
-# Web dashboard
-Flask==3.0.0
+# ──────────────────────────────────────────────
+# Web dashboard e API
+# ──────────────────────────────────────────────
+Flask>=3.0.0
 
+# ──────────────────────────────────────────────
 # Analisi audio e calcoli numerici
-numpy==1.26.0
-PyAudio==0.2.14
+# ──────────────────────────────────────────────
+numpy>=1.26.0
+PyAudio>=0.2.14          # su Windows: pip install pyaudio (o pipwin)
 
-# Hardware Raspberry Pi
+# ──────────────────────────────────────────────
+# Hardware Raspberry Pi (non richiesti su Windows)
+# ──────────────────────────────────────────────
 RPi.GPIO
 board
 neopixel
@@ -13,18 +19,39 @@ adafruit-blinka
 smbus2
 pyserial
 
-# HTTP (es. Shelly lamp)
+# ──────────────────────────────────────────────
+# HTTP — Shelly smart bulb
+# ──────────────────────────────────────────────
 requests
 
-# Tuya local API (purificatore PNI PTA200)
+# ──────────────────────────────────────────────
+# Tuya local API — purificatore PNI PTA200
+#                  e climatizzatore Solight DAC-12000
+# ──────────────────────────────────────────────
 tinytuya
 
+# ──────────────────────────────────────────────
 # InfluxDB
+# ──────────────────────────────────────────────
 influxdb-client
 
-# Configurazione
-pydantic
-pyyaml
+# ──────────────────────────────────────────────
+# Configurazione e validazione
+# ──────────────────────────────────────────────
+pydantic>=2.0.0
+pyyaml>=6.0
 
+# ──────────────────────────────────────────────
 # Test
+# ──────────────────────────────────────────────
 pytest
+
+# ──────────────────────────────────────────────
+# Installazione minima su Windows (sviluppo/test):
+#
+#   pip install flask pyyaml pydantic requests tinytuya numpy
+#   pip install pyaudio          # oppure: pipwin install pyaudio
+#
+# I pacchetti RPi.GPIO / board / neopixel / adafruit-blinka
+# non sono necessari su Windows e possono essere ignorati.
+# ──────────────────────────────────────────────

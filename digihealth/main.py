@@ -68,6 +68,8 @@ def main():
             # 4. Controllo LED (se presenti)
             if actuator_manager:
                 actuator_manager.update(processed_data)
+                if web_manager:
+                    web_manager.update_actuators(actuator_manager.get_status())
 
             time.sleep(30)  # Ciclo ogni 30 secondi
 

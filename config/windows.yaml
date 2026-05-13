@@ -1,49 +1,55 @@
-sensors:
-  zph:
-    enabled: false
-  light:
-    enabled: false
-  microphone:
-    enabled: true
-    device_index: 1          # auto-detect PC mic
-    output_device_index: 2   # default PC output
-
-processors:
-  audio_comfort:
-    enabled: true
-    check_duration: 10
-    comfort_duration: 300
-    tolerance_threshold: 45.0
-    critical_threshold: 55.0
-
 actuators:
   neopixel:
     enabled: false
   shelly:
-    enabled: false
     devices:
-      - name: "Lampada1 Uff Sensorizzato"
-        ip: "192.168.1.191"
-        enabled: true
+    - enabled: true
+      ip: 192.168.1.191
+      name: Lampada1 Uff Sensorizzato
+    enabled: true
+  tuya_ac:
+    device_id: bf189345591dfac26ehvvj
+    enabled: true
+    fan_speed: low
+    ip: 192.168.0.127
+    local_key: 'v;-khIaItEN[+-v:'
+    mode: c
+    temp_key: Temperatura-[°C]
+    temp_off: 26
+    temp_on: 15
+    temp_target: 22
   tuya_purifier:
-    enabled: false
-    device_id: "30604337807d3a7f7eda"
-    ip: "192.168.0.108"
-    local_key: "EB/FoSq??wzH?xML"
-    pm25_limit: 25
     co2_limit: 800
-
+    device_id: 30604337807d3a7f7eda
+    enabled: false
+    ip: 192.168.0.108
+    local_key: EB/FoSq??wzH?xML
+    pm25_limit: 25
 communicator:
+  ipc:
+    db_path: null
+    method: sqlite
   telegraf:
     enabled: false
-  ipc:
-    method: "sqlite"
-    db_path: null
-
+logging:
+  level: INFO
+processors:
+  audio_comfort:
+    check_duration: 10
+    comfort_duration: 300
+    critical_threshold: 55
+    enabled: true
+    tolerance_threshold: 45
+sensors:
+  light:
+    enabled: false
+  microphone:
+    device_index: 1
+    enabled: true
+    output_device_index: 2
+  zph:
+    enabled: false
 web:
   enabled: true
-  host: "127.0.0.1"
+  host: 127.0.0.1
   port: 5000
-
-logging:
-  level: "INFO"

@@ -151,6 +151,62 @@
             min-width: 44px; display: inline-block; text-align: center;
         }
 
+        /* ---- ACTUATORS ROW ---- */
+        .actuators-row {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            padding: 0 2px;
+        }
+        .act-card {
+            display: flex; align-items: center; gap: 5px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.38);
+            border: 1px solid rgba(208,170,132,0.4);
+            border-radius: 10px;
+            font-size: 0.73rem;
+        }
+        .act-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1);
+        }
+        .act-name { font-weight: 600; color: var(--text-light); }
+        .act-on   { font-weight: 700; color: #4a7c5f; }
+        .act-off  { color: #bbb; }
+        .act-sub  { font-size: 0.68rem; color: #aaa; }
+
+        /* ---- SHELLY LAMP CARD ---- */
+        .shelly-card {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 14px 6px 10px;
+            background: rgba(255,255,255,0.38);
+            border: 1px solid rgba(208,170,132,0.4);
+            border-radius: 12px;
+            font-size: 0.73rem;
+            transition: border-color 0.4s;
+        }
+        .shelly-card.online { border-color: rgba(208,170,100,0.6); }
+        .bulb-wrap {
+            position: relative; width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .bulb-glow {
+            position: absolute; inset: 0; border-radius: 50%;
+            transition: background 0.6s, box-shadow 0.6s;
+        }
+        .bulb-icon {
+            font-size: 1.1rem; position: relative; z-index: 1;
+            filter: grayscale(1);
+            transition: filter 0.6s;
+        }
+        .shelly-card.online .bulb-icon { filter: grayscale(0); }
+        .shelly-info { display: flex; flex-direction: column; gap: 1px; }
+        .shelly-name { font-weight: 700; color: var(--text-light); line-height: 1.2; }
+        .shelly-meta { display: flex; gap: 6px; align-items: center; }
+        .shelly-status-on  { font-size: 0.68rem; font-weight: 700; color: #c8922a; }
+        .shelly-status-off { font-size: 0.68rem; color: #bbb; }
+        .shelly-brightness { font-size: 0.68rem; color: #aaa; }
+        .shelly-temp       { font-size: 0.68rem; color: #bbb; }
+
         /* ---- SPECTRUM CANVAS ---- */
         #spectrum-wrap {
             flex: 1;
@@ -405,7 +461,8 @@
         <div class="btn-row">
             <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
             <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
-            <button class="btn btn-exit" onclick="exitApp()">Esci</button>
+            <button class="btn btn-exit" onclick="window.location='/config'">Config</button>
+        <button class="btn btn-exit" onclick="exitApp()">Esci</button>
         </div>
 
     </div>
@@ -423,6 +480,9 @@
         <div>CO2: <span id="co2-val">--</span></div>
         <div>IAQI: <span id="iaqi-val">--</span></div>
     </div>
+
+    <!-- ACTUATORS -->
+    <div class="actuators-row" id="actuators-row"></div>
 
     <!-- SPECTRUM -->
     <div id="spectrum-wrap">
@@ -711,6 +771,90 @@ function closeResultModal() {
 }
 
 // -----------------------------------------------------------------------
+// Actuators renderer
+// -----------------------------------------------------------------------
+function kelvinToRgb(k) {
+    // 2700K → caldo ambra, 6500K → bianco freddo
+    const t = Math.max(0, Math.min(1, (k - 2700) / (6500 - 2700)));
+    const r = 255;
+    const g = Math.round(160 + t * 95);   // 160 → 255
+    const b = Math.round(60  + t * 195);  // 60  → 255
+    return `rgb(${r},${g},${b})`;
+}
+
+function renderActuators(a) {
+    const el = document.getElementById('actuators-row');
+    if (!a || !Object.keys(a).length) { el.innerHTML = ''; return; }
+    let html = '';
+
+    // NeoPixel
+    if (a.neopixel) {
+        const n = a.neopixel;
+        const dotColor = n.active ? (n.color_hex || '#00b4ff') : '#ddd';
+        html += `<div class="act-card">
+            <span class="act-dot" style="background:${dotColor}"></span>
+            <span class="act-name">NeoPixel</span>
+            <span class="${n.active ? 'act-on' : 'act-off'}">${n.active ? 'ON' : 'OFF'}</span>
+            ${n.active ? `<span class="act-sub">IAQI ${n.iaqi}</span>` : ''}
+        </div>`;
+    }
+
+    // Shelly
+    if (a.shelly && a.shelly.devices) {
+        a.shelly.devices.forEach(d => {
+            const on = d.online;
+            const color = on ? kelvinToRgb(d.temp_k) : 'rgba(200,200,200,0.2)';
+            const glowSize = on ? Math.round(d.brightness / 8) : 0;
+            const glowAlpha = on ? (d.brightness / 200).toFixed(2) : '0';
+            const glowCss = on
+                ? `background:radial-gradient(circle, ${color} 0%, transparent 70%);
+                   box-shadow: 0 0 ${glowSize}px ${glowSize/2}px ${color};`
+                : '';
+            const tempLabel = d.temp_k <= 3000 ? 'Calda' : d.temp_k >= 5500 ? 'Fredda' : 'Neutra';
+            html += `<div class="shelly-card ${on ? 'online' : ''}">
+                <div class="bulb-wrap">
+                    <div class="bulb-glow" style="${glowCss}"></div>
+                    <span class="bulb-icon">💡</span>
+                </div>
+                <div class="shelly-info">
+                    <span class="shelly-name">${d.name}</span>
+                    <div class="shelly-meta">
+                        <span class="${on ? 'shelly-status-on' : 'shelly-status-off'}">${on ? 'ONLINE' : 'OFFLINE'}</span>
+                        ${on ? `<span class="shelly-brightness">${d.brightness}%</span>` : ''}
+                        ${on ? `<span class="shelly-temp">${tempLabel} ${d.temp_k}K</span>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        });
+    }
+
+    // Tuya Purificatore
+    if (a.tuya_purifier !== undefined) {
+        const p = a.tuya_purifier;
+        html += `<div class="act-card">
+            <span>🌀</span>
+            <span class="act-name">Purificatore</span>
+            <span class="${p.is_on ? 'act-on' : 'act-off'}">${p.is_on ? 'ON' : 'OFF'}</span>
+            ${p.pm25 != null ? `<span class="act-sub">PM2.5 ${p.pm25}</span>` : ''}
+            ${p.co2  != null ? `<span class="act-sub">CO₂ ${p.co2}</span>` : ''}
+        </div>`;
+    }
+
+    // Tuya AC
+    if (a.tuya_ac !== undefined) {
+        const ac = a.tuya_ac;
+        html += `<div class="act-card">
+            <span>❄️</span>
+            <span class="act-name">Climatizzatore</span>
+            <span class="${ac.is_on ? 'act-on' : 'act-off'}">${ac.is_on ? 'ON' : 'OFF'}</span>
+            ${ac.temp != null ? `<span class="act-sub">${ac.temp}°C</span>` : ''}
+        </div>`;
+    }
+
+    el.innerHTML = html;
+}
+
+// -----------------------------------------------------------------------
 // Refresh loop — setTimeout chain invece di setInterval
 // Evita l'accumulo di richieste pendenti se il Pi è sotto carico
 // -----------------------------------------------------------------------
@@ -841,6 +985,9 @@ function refresh() {
 
             // Aggiorna anche il live-dB nell'overlay calibrazione se visibile
             document.getElementById('cal-db-live').innerText = db.toFixed ? db.toFixed(1) + ' dB' : db + ' dB';
+
+            // Attuatori
+            renderActuators(data.actuators);
         })
         .catch(() => {})
         .finally(() => {

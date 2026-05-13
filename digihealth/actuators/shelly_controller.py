@@ -21,6 +21,10 @@ class ShellyController:
             d for d in config.get('devices', [])
             if d.get('enabled', True)
         ]
+        self._states: dict = {
+            d.get('ip', ''): {'name': d.get('name', d.get('ip', '?')), 'online': False, 'brightness': 0, 'temp_k': 2700}
+            for d in self.devices
+        }
         if not self.devices:
             logger.warning("ShellyController: nessun dispositivo abilitato in config")
         else:
@@ -38,10 +42,14 @@ class ShellyController:
             ip = device.get('ip')
             name = device.get('name', ip)
             try:
-                if not self._is_online(ip):
+                online = self._is_online(ip)
+                self._states[ip]['online'] = online
+                if not online:
                     logger.debug(f"Shelly '{name}' ({ip}) offline, salto")
                     continue
                 self._send_command(ip, brightness, temp_k)
+                self._states[ip]['brightness'] = brightness
+                self._states[ip]['temp_k'] = temp_k
                 logger.debug(f"Shelly '{name}': brightness={brightness}% temp={temp_k}K lux={lux}")
             except requests.Timeout:
                 logger.warning(f"Shelly '{name}' ({ip}): timeout")
@@ -49,6 +57,9 @@ class ShellyController:
                 logger.warning(f"Shelly '{name}' ({ip}): non raggiungibile")
             except Exception as e:
                 logger.warning(f"Shelly '{name}' ({ip}): errore {e}")
+
+    def get_status(self) -> dict:
+        return {'devices': list(self._states.values())}
 
     def _is_online(self, ip: str) -> bool:
         try:

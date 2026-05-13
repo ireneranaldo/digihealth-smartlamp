@@ -1,6 +1,6 @@
 # DigiHealth Lamp
 
-Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori di qualità dell'aria, calcola l'IAQI (Indoor Air Quality Index), controlla una striscia LED NeoPixel e invia tutti i dati a InfluxDB. Include un'interfaccia web per il monitoraggio in tempo reale e la gestione del comfort acustico.
+Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori di qualità dell'aria, calcola l'IAQI (Indoor Air Quality Index), controlla una striscia LED NeoPixel, lampadine Shelly e dispositivi Tuya (purificatore + climatizzatore) via rete locale. Invia i dati a InfluxDB e offre una dashboard web con configurazione e riavvio integrati.
 
 ---
 
@@ -13,9 +13,11 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 | **NeoPixel** | Striscia 144 LED: pixel 0–79 visualizzano IAQI con effetto breathing, pixel 80–143 simulano la luce circadiana |
 | **Shelly** | Lampadine smart via HTTP API: luce circadiana (6500K giorno / 2700K sera) e dimming adattivo in base al lux |
 | **Purificatore Tuya** | PNI PTA200 via Tuya local API: accensione automatica se PM2.5 > 25 µg/m³ o CO2 > 800 ppm |
+| **Climatizzatore Tuya** | Solight DAC-12000 via Tuya local API (v3.4): accensione/spegnimento automatico in base alla temperatura, con isteresi |
 | **Audio comfort** | Monitoraggio livello sonoro, calibrazione automatica, riproduzione pink noise o file audio se la soglia viene superata |
-| **Dashboard web** | Flask su porta 5000: grafici FFT in tempo reale, livello dB, qualità dell'aria, controllo volume e modalità |
-| **InfluxDB** | Invio diretto a InfluxDB Cloud via `influxdb-client` (measurement `ZPHSensor_sensore`) |
+| **Dashboard web** | Flask su porta 5000: spettro FFT, livello dB, qualità aria, stato attuatori in tempo reale |
+| **Pagina Config** | Interfaccia web per modificare `config/default.yaml` (o `windows.yaml`) senza toccare i file; bottone **Riavvia** integrato |
+| **InfluxDB** | Invio diretto a InfluxDB Cloud via `influxdb-client` |
 
 ---
 
@@ -25,8 +27,8 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 - Sensore ZPH01B collegato a `/dev/serial0` (UART, 9600 baud)
 - Sensore BH1750 collegato a I2C bus 1, indirizzo `0x23`
 - Striscia NeoPixel (144 pixel) su GPIO 12
-- Microfono USB (USB PnP Sound Device, `device_index: 1`)
-- Connessione di rete (per InfluxDB e dashboard web)
+- Microfono USB (`device_index: 1`)
+- Connessione di rete (per Shelly, Tuya, InfluxDB, dashboard)
 
 ---
 
@@ -65,7 +67,7 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 5. Installare il pacchetto
+### 5. Installare le dipendenze
 
 ```bash
 pip install --upgrade pip
@@ -74,12 +76,7 @@ pip install -e .
 
 ### 6. Configurare il servizio systemd
 
-Aggiornare il file di servizio con i percorsi corretti, poi installarlo:
-
 ```bash
-# Verifica che User e WorkingDirectory in systemd/digihealth-lamp.service
-# corrispondano al tuo utente (es. digip) e alla cartella del progetto.
-
 sudo cp systemd/digihealth-lamp.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable digihealth-lamp
@@ -95,96 +92,116 @@ sudo journalctl -u digihealth-lamp -f
 
 ---
 
+## Installazione su Windows (sviluppo/test)
+
+```powershell
+cd C:\...\digihealth-smartlamp
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install flask pyyaml pydantic requests tinytuya numpy
+pip install pyaudio   # oppure: pip install pipwin && pipwin install pyaudio
+.\venv\Scripts\python.exe -m digihealth.main
+```
+
+Il file di configurazione caricato automaticamente su Windows è `config/windows.yaml`.
+
+---
+
 ## Configurazione
 
-Il file principale è `config/default.yaml`. Su Windows viene caricato automaticamente `config/windows.yaml`. È possibile sovrascrivere il file con la variabile d'ambiente `DIGIHEALTH_CONFIG`.
+Il file principale è `config/default.yaml` (Raspberry Pi) o `config/windows.yaml` (Windows).  
+È possibile sovrascrivere il file con la variabile d'ambiente `DIGIHEALTH_CONFIG`.
+
+La configurazione è modificabile anche dalla **pagina web** `http://<ip>:5000/config` senza toccare i file.
 
 ### Parametri chiave
 
 ```yaml
 sensors:
-  zph:
-    port: "/dev/serial0"     # Porta UART del sensore ZPH01B
   microphone:
-    device_index: 1          # Indice microfono USB (verificare con arecord -l)
+    device_index: 1          # verificare con arecord -l (Linux) o Device Manager (Windows)
 
 processors:
   audio_comfort:
-    tolerance_threshold: 45.0   # dB sopra cui si entra in CHECK
-    critical_threshold: 55.0    # dB sopra cui parte il comfort audio
-    check_duration: 10          # secondi di monitoraggio prima di intervenire
-    comfort_duration: 300       # secondi di riproduzione audio comfort
+    tolerance_threshold: 45.0   # dB soglia comfort
+    critical_threshold: 55.0    # dB soglia critica
+    check_duration: 10          # sec di ascolto prima di intervenire
+    comfort_duration: 300       # sec di riproduzione audio comfort
 
 actuators:
   neopixel:
+    enabled: true
     pin: 12
     num_pixels: 144
-    iaqi_range: [0, 79]         # pixel per IAQI
-    circadian_range: [80, 143]  # pixel per luce circadiana
 
   shelly:
-    enabled: true               # false per disabilitare
+    enabled: true
     devices:
       - name: "Lampada1 Uff Sensorizzato"
         ip: "192.168.1.191"
         enabled: true
-      # aggiungere altre Shelly con lo stesso formato
 
   tuya_purifier:
-    enabled: false              # true per attivare
-    device_id: "..."            # ID dispositivo Tuya
+    enabled: false
+    device_id: "..."
     ip: "192.168.0.108"
-    local_key: "..."            # chiave locale Tuya
-    pm25_limit: 25              # µg/m³ sopra cui si accende
-    co2_limit: 800              # ppm sopra cui si accende
+    local_key: "..."
+    pm25_limit: 25        # µg/m³ — accende se superato
+    co2_limit: 800        # ppm  — accende se superato
 
-communicator:
-  telegraf:
-    measurement: "ZPHSensor_sensore"
-    tags:
-      sensor: "ZPHS01B"
-      host: "raspberry01"       # identificativo del dispositivo
+  tuya_ac:
+    enabled: false
+    device_id: "..."
+    ip: "192.168.0.127"
+    local_key: "..."
+    temp_on: 26           # accende se temp > 26°C
+    temp_off: 24          # spegne se temp < 24°C
+    temp_target: 22       # temperatura impostata sull'AC
+    mode: "c"             # c=freddo | h=caldo | d=deumidifica | f=ventola | a=auto
+    fan_speed: "auto"
 
 web:
   enabled: true
   port: 5000
 ```
 
-### Verificare il device index del microfono
+### Trovare IP e local_key di un dispositivo Tuya
 
 ```bash
-arecord -l
-# Cerca "USB PnP Sound Device" e usa Card X, Device Y → device_index: X
+python -m tinytuya scan        # individua IP e Device ID sulla LAN
+python -m tinytuya wizard      # guida interattiva per ottenere local_key
 ```
 
 ---
 
 ## Utilizzo
 
-### Avvio tramite servizio (produzione)
+### Dashboard web
 
-```bash
-sudo systemctl start digihealth-lamp
-```
+`http://<ip-raspberry>:5000`
 
-### Avvio manuale (test/debug)
+Mostra:
+- Livello sonoro in dB e spettro FFT in tempo reale
+- Temperatura, umidità, CO2, IAQI
+- **Riga attuatori**: stato in tempo reale di NeoPixel (colore IAQI), Shelly (lampadina colorata con glow), purificatore Tuya (ON/OFF + PM2.5/CO2), climatizzatore Tuya (ON/OFF + temperatura)
+- Pulsanti calibrazione, avvio/stop, selezione modalità comfort, volume
+
+### Pagina configurazione web
+
+`http://<ip-raspberry>:5000/config`
+
+- Modifica tutti i parametri di configurazione direttamente dal browser
+- Bottone **Salva** → scrive il file YAML
+- Bottone **Riavvia** → riavvia automaticamente l'applicazione e ricarica la pagina
+
+### Avvio manuale (debug)
 
 ```bash
 sudo systemctl stop digihealth-lamp   # ferma il servizio prima
 source venv/bin/activate
 sudo ./venv/bin/python3 -m digihealth.main
-# CTRL+C per fermare, non CTRL+Z
+# CTRL+C per fermare
 ```
-
-### Dashboard web
-
-Apri `http://<ip-raspberry>:5000` nel browser.
-
-La dashboard mostra:
-- Livello sonoro in dB e spettro FFT in tempo reale
-- Temperatura, umidità, CO2 e IAQI
-- Pulsanti: calibra microfono, avvia/ferma monitoraggio, seleziona modalità comfort
-- Slider volume
 
 ---
 
@@ -193,40 +210,38 @@ La dashboard mostra:
 ```
 digihealth-lamp/
 ├── digihealth/
-│   ├── main.py                  # Entry point, loop principale (ciclo 30s)
-│   ├── config.py                # Caricamento e validazione config (Pydantic)
-│   ├── logger.py                # Logger strutturato
-│   ├── audio_worker.py          # Processo separato per PyAudio
+│   ├── main.py                     # Entry point, loop principale (ciclo 30s)
+│   ├── config.py                   # Caricamento e validazione config (Pydantic)
+│   ├── logger.py
+│   ├── audio_worker.py             # Processo separato per PyAudio
 │   ├── sensors/
-│   │   ├── base.py              # Classe base astratta
-│   │   ├── zph.py               # Sensore ZPH01B (UART)
-│   │   ├── light.py             # Sensore BH1750 (I2C)
-│   │   └── microphone.py        # Acquisizione audio
+│   │   ├── base.py
+│   │   ├── zph.py                  # Sensore ZPH01B (UART)
+│   │   ├── light.py                # Sensore BH1750 (I2C)
+│   │   └── microphone.py
 │   ├── processors/
-│   │   ├── iaqi.py              # Calcolo IAQI
-│   │   └── audio_comfort.py     # State machine comfort acustico
+│   │   ├── iaqi.py
+│   │   └── audio_comfort.py
 │   ├── actuators/
-│   │   ├── neopixel_controller.py  # Controllo striscia LED
-│   │   ├── shelly_controller.py    # Lampadine Shelly via HTTP API
-│   │   └── tuya_purifier.py        # Purificatore PNI PTA200 via Tuya
+│   │   ├── __init__.py             # ActuatorManager con get_status()
+│   │   ├── neopixel_controller.py
+│   │   ├── shelly_controller.py
+│   │   ├── tuya_purifier.py        # Purificatore PNI PTA200 (Tuya v3.3)
+│   │   └── tuya_ac.py              # Climatizzatore Solight DAC-12000 (Tuya v3.4)
 │   ├── communicator/
-│   │   └── telegraf_client.py   # Invio dati a InfluxDB
+│   │   └── telegraf_client.py
 │   └── web/
-│       ├── __init__.py          # Flask app e route API
+│       ├── __init__.py             # Flask: dashboard, config, restart
 │       └── templates/
-│           └── dashboard.html
+│           ├── dashboard.html      # Dashboard real-time + stato attuatori
+│           └── config.html         # Pagina configurazione YAML + riavvio
 ├── config/
-│   ├── default.yaml             # Configurazione Raspberry Pi
-│   └── windows.yaml             # Configurazione Windows (sviluppo)
+│   ├── default.yaml                # Configurazione Raspberry Pi
+│   └── windows.yaml                # Configurazione Windows
 ├── systemd/
-│   └── digihealth-lamp.service  # Unit file systemd
+│   └── digihealth-lamp.service
 ├── audio/
-│   ├── low-pink-noise.mp3
-│   └── wind-chimes-and-light-rain.mp3
-├── docker/
-│   └── Dockerfile
 ├── tests/
-│   └── test_basic.py
 ├── requirements.txt
 ├── setup.py
 └── GUIDA_SERVIZIO.txt
@@ -242,8 +257,9 @@ Microfono USB ──┘                          │
                         ↓                  ↓                  ↓              ↓
                    InfluxDB          NeoPixel LED         Dashboard      Attuatori
                    (Cloud)           (GPIO 12)         (Flask :5000)   rete locale
-                                                                        ├ Shelly HTTP
-                                                                        └ Tuya (purif.)
+                                                        /config            ├ Shelly HTTP
+                                                        /restart           ├ Tuya Purif.
+                                                                           └ Tuya AC
 ```
 
 ---
@@ -256,11 +272,11 @@ Microfono USB ──┘                          │
 | `I2C error` / sensore luce non trovato | Verificare con `i2cdetect -y 1`; deve apparire `0x23` |
 | LED NeoPixel non si accendono | GPIO 12 richiede permessi root; verificare il cablaggio |
 | Microfono non trovato | Verificare `device_index` con `arecord -l`; usare `null` per auto-detect |
-| Dashboard non raggiungibile | Verificare che `web.enabled: true` in config e che la porta 5000 sia aperta |
-| InfluxDB: errore autenticazione | Verificare token e URL in `communicator/telegraf_client.py` |
-| Shelly offline nel log | La Shelly non è raggiungibile in rete; verificare IP in config e che sia sulla stessa rete WiFi |
-| Tuya: `Connection refused` | Verificare IP e `local_key`; il dispositivo Tuya deve essere sulla LAN locale |
-| Tuya: `key` errata | Riottenere la `local_key` con `tinytuya wizard` o dall'app Smart Life |
+| Dashboard non raggiungibile | Verificare `web.enabled: true` e che la porta 5000 sia aperta |
+| Shelly offline nel log | Verificare IP in config e che sia sulla stessa rete WiFi |
+| Tuya: `Connection refused` | Verificare IP e `local_key`; il dispositivo deve essere sulla LAN locale |
+| Tuya: `key` errata | Riottenere la `local_key` con `tinytuya wizard` o dall'API Tuya Cloud |
+| AC Tuya: DPS non corretti | Eseguire `python -m tinytuya scan` e verificare la mappa DPS con `d.status()` |
 
 ---
 

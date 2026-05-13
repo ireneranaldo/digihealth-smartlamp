@@ -13,6 +13,9 @@ class NeoPixelController:
         self.circadian_range = config.get('circadian_range', [80, 143])
         self.start_time = time.time()
         self.pixels = None
+        self._last_color_hex = '#000000'
+        self._last_iaqi = 0
+        self._active = False
 
         try:
             import board
@@ -34,13 +37,18 @@ class NeoPixelController:
         try:
             iaqi = data.get('IAQI', 0)
             lux  = data.get('lux-IntensitaLuminosa', 0)
+            self._last_iaqi = iaqi
 
             if not self._is_active_time():
                 self.pixels.fill((0, 0, 0))
                 self.pixels.show()
+                self._active = False
+                self._last_color_hex = '#000000'
                 return
 
             color = self._get_iaqi_color(iaqi)
+            self._active = True
+            self._last_color_hex = '#{:02x}{:02x}{:02x}'.format(*color)
             self._set_iaqi_breathing(color)
 
             temp_k, brightness = self._calculate_circadian_light(lux)
@@ -80,6 +88,14 @@ class NeoPixelController:
     def _calculate_circadian_light(self, lux: float) -> tuple:
         temp_k = 6500 if 7 <= datetime.datetime.now().hour < 16 else 2700
         return temp_k, 10
+
+    def get_status(self) -> dict:
+        return {
+            'available': self.pixels is not None,
+            'active': self._active,
+            'color_hex': self._last_color_hex,
+            'iaqi': self._last_iaqi,
+        }
 
     def _set_circadian_segment(self, rgb: tuple, brightness: float):
         r, g, b = rgb

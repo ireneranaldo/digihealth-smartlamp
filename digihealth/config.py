@@ -18,6 +18,8 @@ class ProcessorConfig(BaseModel):
 class ActuatorConfig(BaseModel):
     neopixel: Dict[str, Any] = Field(default_factory=dict)
     shelly: Dict[str, Any] = Field(default_factory=dict)
+    tuya_purifier: Dict[str, Any] = Field(default_factory=dict)
+    tuya_ac: Dict[str, Any] = Field(default_factory=dict)
 
 class CommunicatorConfig(BaseModel):
     telegraf: Dict[str, Any] = Field(default_factory=dict)

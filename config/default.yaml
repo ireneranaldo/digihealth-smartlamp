@@ -54,6 +54,17 @@ actuators:
     local_key: "EB/FoSq??wzH?xML"
     pm25_limit: 25
     co2_limit: 800
+  tuya_ac:
+    enabled: false
+    device_id: ""
+    ip: "192.168.0.127"
+    local_key: "v;-khIaItEN[+-v:"
+    temp_on: 26      # accende se temp > 26°C
+    temp_off: 24     # spegne se temp < 24°C
+    temp_target: 22  # temperatura impostata sull'AC
+    mode: "c"        # c=cold | h=heat | d=dry | f=fan | a=auto
+    fan_speed: "auto"
+    temp_key: "Temperatura-[°C]"
 
 communicator:
   telegraf:

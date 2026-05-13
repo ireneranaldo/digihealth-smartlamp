@@ -1,10 +1,19 @@
-import os, threading, logging
+import os, threading, logging, sys, subprocess, time
 import multiprocessing
+import platform as _plat
 import queue as _q
+import yaml
+
+_LAUNCH_DIR = os.getcwd()
 from flask import Flask, render_template, jsonify, request
 from ..config import config
 from ..logger import logger
 from ..audio_worker import audio_process_fn
+
+_CFG_PATH = os.environ.get(
+    'DIGIHEALTH_CONFIG',
+    'config/windows.yaml' if _plat.system() == 'Windows' else 'config/default.yaml'
+)
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
@@ -33,6 +42,7 @@ state = {
     "air_quality":    {"temp": "--", "humidity": "--", "co2": "--", "iaqi": "--"},
     "noise_detected": False,
     "fft_active":     True,
+    "actuators":      {},
 }
 
 # ── IPC ───────────────────────────────────────────────────────────────────────
@@ -157,6 +167,49 @@ def shutdown_kiosk():
     return "Closing..."
 
 
+@app.route('/config')
+def config_page():
+    return render_template('config.html')
+
+
+@app.route('/config/data')
+def config_data():
+    try:
+        with open(_CFG_PATH, encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return jsonify(data or {})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/restart', methods=['POST'])
+def restart():
+    def _do():
+        time.sleep(0.6)
+        subprocess.Popen(
+            [sys.executable, '-m', 'digihealth.main'],
+            cwd=_LAUNCH_DIR
+        )
+        os._exit(0)
+    threading.Thread(target=_do, daemon=True).start()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/config/save', methods=['POST'])
+def config_save():
+    try:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({'status': 'error', 'message': 'Payload non valido'}), 400
+        with open(_CFG_PATH, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        logger.info(f"Config salvata su {_CFG_PATH}")
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        logger.warning(f"config_save errore: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # ── WebManager ────────────────────────────────────────────────────────────────
 class WebManager:
     def __init__(self):
@@ -168,6 +221,9 @@ class WebManager:
 
     def get_status(self):
         return state
+
+    def update_actuators(self, actuators_status: dict):
+        state["actuators"] = actuators_status
 
     def update_data(self, processed_data: dict):
         try:

@@ -19,7 +19,9 @@ class TuyaPurifier:
     def __init__(self, config: Dict[str, Any]):
         self.pm25_limit = config.get('pm25_limit', 25)
         self.co2_limit = config.get('co2_limit', 800)
-        self._is_on: Optional[bool] = None  # None forza valutazione al primo ciclo
+        self._is_on: Optional[bool] = None
+        self._last_pm25: Optional[float] = None
+        self._last_co2: Optional[float] = None
 
         try:
             self.device = tinytuya.OutletDevice(
@@ -43,6 +45,8 @@ class TuyaPurifier:
 
         pm25 = data.get('PM2_5-Particolato-[µg/m^3]', 0)
         co2 = data.get('CO2-AnidrideCarbonica-[ppm]', 0)
+        self._last_pm25 = pm25
+        self._last_co2 = co2
         deve_accendersi = pm25 > self.pm25_limit or co2 > self.co2_limit
 
         # Legge lo stato reale dal dispositivo e logga i dati interni
@@ -61,6 +65,13 @@ class TuyaPurifier:
             self._is_on = deve_accendersi
         except Exception as e:
             logger.warning(f"TuyaPurifier: errore comando: {e}")
+
+    def get_status(self) -> dict:
+        return {
+            'is_on': self._is_on or False,
+            'pm25': self._last_pm25,
+            'co2': self._last_co2,
+        }
 
     def _log_device_status(self):
         """Legge e logga lo stato interno del purificatore (opzionale)."""
