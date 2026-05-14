@@ -172,6 +172,39 @@ def config_page():
     return render_template('config.html')
 
 
+@app.route('/thresholds')
+def thresholds_page():
+    return render_template('thresholds.html')
+
+
+@app.route('/thresholds/data')
+def thresholds_data():
+    try:
+        with open(_CFG_PATH, encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+        return jsonify(data.get('thresholds', {}))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/thresholds/save', methods=['POST'])
+def thresholds_save():
+    try:
+        new_thr = request.get_json(silent=True)
+        if new_thr is None:
+            return jsonify({'status': 'error', 'message': 'Payload non valido'}), 400
+        with open(_CFG_PATH, encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+        data['thresholds'] = new_thr
+        with open(_CFG_PATH, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        logger.info(f"Soglie salvate su {_CFG_PATH}")
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        logger.warning(f"thresholds_save errore: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/config/data')
 def config_data():
     try:

@@ -64,7 +64,7 @@ actuators:
     temp_target: 22  # temperatura impostata sull'AC
     mode: "c"        # c=cold | h=heat | d=dry | f=fan | a=auto
     fan_speed: "auto"
-    temp_key: "Temperatura-[°C]"
+    temp_key: "TEMP-[C]"
 
 communicator:
   telegraf:
@@ -85,3 +85,41 @@ web:
 logging:
   level: "INFO"
   file: "/var/log/digihealth-lamp.log"
+
+thresholds:
+  co2:
+    tolerance: 801
+    critical: 1001
+  tvoc:
+    tolerance: 2
+    critical: 3
+  ch2o:
+    tolerance: 0.06
+    critical: 0.11
+  pm1:
+    tolerance: 10
+    critical: 20
+  pm25:
+    tolerance: 15
+    critical: 35
+  pm10:
+    tolerance: 45
+    critical: 90
+  co:
+    tolerance: 7
+    critical: 10
+  o3:
+    tolerance: 0.07
+    critical: 0.12
+  no2:
+    tolerance: 0.05
+    critical: 0.1
+  temp:
+    tolerance: 26
+    critical: 28.1
+  hum:
+    tolerance: 60
+    critical: 70.1
+  lux:
+    tolerance: 200
+    critical: 100

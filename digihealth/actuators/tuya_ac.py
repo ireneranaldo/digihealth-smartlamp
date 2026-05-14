@@ -30,7 +30,7 @@ class TuyaAC:
         self.temp_target = config.get('temp_target', 22)
         self.mode = config.get('mode', 'cold')
         self.fan_speed = config.get('fan_speed', 'auto')
-        self.temp_key = config.get('temp_key', 'Temperatura-[°C]')
+        self.temp_key = config.get('temp_key', 'TEMP-[C]')
         self._is_on: Optional[bool] = None
         self._last_temp: Optional[float] = None
 

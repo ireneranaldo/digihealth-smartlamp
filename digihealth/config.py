@@ -41,6 +41,7 @@ class DigiHealthConfig(BaseModel):
     communicator: CommunicatorConfig = Field(default_factory=CommunicatorConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    thresholds: Dict[str, Any] = Field(default_factory=dict)
 
 def load_config(config_path: str = "config/default.yaml") -> DigiHealthConfig:
     """Load configuration from YAML file."""

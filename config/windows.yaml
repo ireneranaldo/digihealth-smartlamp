@@ -14,14 +14,14 @@ actuators:
     ip: 192.168.0.127
     local_key: 'v;-khIaItEN[+-v:'
     mode: c
-    temp_key: Temperatura-[°C]
+    temp_key: TEMP-[C]
     temp_off: 26
-    temp_on: 15
+    temp_on: 10
     temp_target: 22
   tuya_purifier:
     co2_limit: 800
     device_id: 30604337807d3a7f7eda
-    enabled: false
+    enabled: true
     ip: 192.168.0.108
     local_key: EB/FoSq??wzH?xML
     pm25_limit: 25
@@ -49,6 +49,43 @@ sensors:
     output_device_index: 2
   zph:
     enabled: false
+thresholds:
+  ch2o:
+    critical: 0.11
+    tolerance: 0.06
+  co:
+    critical: 10
+    tolerance: 7
+  co2:
+    critical: 1001
+    tolerance: 801
+  hum:
+    critical: 70.1
+    tolerance: 60
+  lux:
+    critical: 100
+    tolerance: 200
+  no2:
+    critical: 0.1
+    tolerance: 0.05
+  o3:
+    critical: 0.12
+    tolerance: 0.07
+  pm1:
+    critical: 20
+    tolerance: 10
+  pm10:
+    critical: 90
+    tolerance: 45
+  pm25:
+    critical: 35
+    tolerance: 15
+  temp:
+    critical: 28.1
+    tolerance: 10
+  tvoc:
+    critical: 3
+    tolerance: 2
 web:
   enabled: true
   host: 127.0.0.1
