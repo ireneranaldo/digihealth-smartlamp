@@ -98,7 +98,24 @@
             align-items: center; gap: 8px;
         }
         .field-row.cols-2 { grid-template-columns: 1fr 1fr; }
+        .field-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
         .field-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+        .thr-readonly {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 10px; border-radius: 8px;
+            border: 1px dashed var(--border);
+            background: rgba(255,255,255,0.25);
+            font-size: 0.82rem; color: var(--text-light);
+        }
+        .thr-readonly strong { color: var(--text); font-weight: 700; }
+        .thr-link {
+            font-size: 0.72rem; color: var(--accent); font-weight: 600;
+            text-decoration: none; white-space: nowrap;
+            padding: 2px 8px; border-radius: 999px;
+            border: 1px solid rgba(202,142,123,0.4);
+            transition: background 0.15s;
+        }
+        .thr-link:hover { background: rgba(202,142,123,0.15); }
         label {
             font-size: 0.78rem; color: var(--text-light); font-weight: 600;
         }
@@ -246,11 +263,15 @@ function renderActuators() {
                 <label>Local Key</label>
                 <input type="password" id="ac_local_key" value="${ac.local_key || ''}">
             </div>
-            <div class="field-row cols-4">
-                <div>
-                    <label>Accendi se &gt;</label>
-                    <div class="field-group"><input type="number" id="ac_temp_on" value="${ac.temp_on ?? 26}" style="width:60px"><span class="field-unit">°C</span></div>
+            <div class="field-row">
+                <label>Accendi se &gt;</label>
+                <div class="thr-readonly">
+                    <strong>${((cfg.thresholds||{}).temp||{}).tolerance ?? 26} °C</strong>
+                    <span style="flex:1; font-size:0.7rem">da Soglie → TEMP tolleranza</span>
+                    <a href="/thresholds" class="thr-link">Modifica soglie</a>
                 </div>
+            </div>
+            <div class="field-row cols-3">
                 <div>
                     <label>Spegni se &lt;</label>
                     <div class="field-group"><input type="number" id="ac_temp_off" value="${ac.temp_off ?? 24}" style="width:60px"><span class="field-unit">°C</span></div>
@@ -309,13 +330,20 @@ function renderActuators() {
             </div>
             <div class="field-row cols-2">
                 <div>
-                    <label>Soglia PM2.5</label>
-                    <div class="field-group"><input type="number" id="pur_pm25" value="${pur.pm25_limit ?? 25}" style="width:70px"><span class="field-unit">µg/m³</span></div>
+                    <label>Accende se PM2.5 &gt;</label>
+                    <div class="thr-readonly">
+                        <strong>${((cfg.thresholds||{}).pm25||{}).tolerance ?? 15} µg/m³</strong>
+                    </div>
                 </div>
                 <div>
-                    <label>Soglia CO2</label>
-                    <div class="field-group"><input type="number" id="pur_co2" value="${pur.co2_limit ?? 800}" style="width:70px"><span class="field-unit">ppm</span></div>
+                    <label>Accende se CO2 &gt;</label>
+                    <div class="thr-readonly">
+                        <strong>${((cfg.thresholds||{}).co2||{}).tolerance ?? 801} ppm</strong>
+                    </div>
                 </div>
+            </div>
+            <div style="text-align:right; padding-top:2px">
+                <a href="/thresholds" class="thr-link">Modifica soglie →</a>
             </div>
         </div>
     </div>
@@ -477,7 +505,6 @@ function collect() {
         device_id:   v('ac_device_id'),
         ip:          v('ac_ip'),
         local_key:   v('ac_local_key'),
-        temp_on:     n('ac_temp_on'),
         temp_off:    n('ac_temp_off'),
         temp_target: n('ac_temp_target'),
         mode:        v('ac_mode'),
@@ -487,12 +514,10 @@ function collect() {
     // tuya_purifier
     out.actuators.tuya_purifier = {
         ...(out.actuators.tuya_purifier || {}),
-        enabled:    b('pur_enabled'),
-        device_id:  v('pur_device_id'),
-        ip:         v('pur_ip'),
-        local_key:  v('pur_local_key'),
-        pm25_limit: n('pur_pm25'),
-        co2_limit:  n('pur_co2'),
+        enabled:   b('pur_enabled'),
+        device_id: v('pur_device_id'),
+        ip:        v('pur_ip'),
+        local_key: v('pur_local_key'),
     };
 
     // shelly
