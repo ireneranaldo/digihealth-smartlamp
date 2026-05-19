@@ -56,7 +56,7 @@ actuators:
     co2_limit: 800
   tuya_ac:
     enabled: false
-    device_id: ""
+    device_id: "bf189345591dfac26ehvvj"
     ip: "192.168.0.127"
     local_key: "v;-khIaItEN[+-v:"
     temp_on: 26      # accende se temp > 26°C

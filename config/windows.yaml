@@ -6,22 +6,22 @@ actuators:
     - enabled: true
       ip: 192.168.1.191
       name: Lampada1 Uff Sensorizzato
-    enabled: true
+    enabled: false
   tuya_ac:
-    device_id: bf189345591dfac26ehvvj
-    enabled: true
+    enabled: false
     fan_speed: low
+    device_id: bf189345591dfac26ehvvj
     ip: 192.168.0.127
-    local_key: 'v;-khIaItEN[+-v:'
+    local_key: v;-khIaItEN[+-v:
     mode: c
     temp_key: TEMP-[C]
-    temp_off: 26
+    temp_off: 19
     temp_on: 10
     temp_target: 22
   tuya_purifier:
     co2_limit: 800
     device_id: 30604337807d3a7f7eda
-    enabled: true
+    enabled: false
     ip: 192.168.0.108
     local_key: EB/FoSq??wzH?xML
     pm25_limit: 25

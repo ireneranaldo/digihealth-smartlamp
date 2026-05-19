@@ -173,6 +173,22 @@
         .act-off  { color: #bbb; }
         .act-sub  { font-size: 0.68rem; color: #aaa; }
 
+        /* ---- AC ACTIVE CARD ---- */
+        .act-card.ac-active {
+            background: linear-gradient(135deg, rgba(180,225,255,0.45), rgba(210,240,255,0.25));
+            border-color: rgba(80,160,220,0.55);
+            box-shadow: 0 2px 10px rgba(80,160,220,0.18);
+        }
+        .ac-icon { font-size: 1.1rem; }
+        .ac-icon.active { animation: pulse-cold 2.5s ease-in-out infinite; }
+        @keyframes pulse-cold {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.65; transform: scale(0.88); }
+        }
+        .ac-info { display: flex; flex-direction: column; gap: 1px; }
+        .ac-row  { display: flex; align-items: center; gap: 5px; }
+        .ac-thresholds { font-size: 0.63rem; color: #b0a898; white-space: nowrap; }
+
         /* ---- SHELLY LAMP CARD ---- */
         .shelly-card {
             display: flex; align-items: center; gap: 8px;
@@ -843,12 +859,23 @@ function renderActuators(a) {
 
     // Tuya AC
     if (a.tuya_ac !== undefined) {
-        const ac = a.tuya_ac;
-        html += `<div class="act-card">
-            <span>❄️</span>
-            <span class="act-name">Climatizzatore</span>
-            <span class="${ac.is_on ? 'act-on' : 'act-off'}">${ac.is_on ? 'ON' : 'OFF'}</span>
-            ${ac.temp != null ? `<span class="act-sub">${ac.temp}°C</span>` : ''}
+        const ac   = a.tuya_ac;
+        const isOn = ac.is_on;
+        const modeLabel = { c:'freddo', h:'caldo', d:'deumid.', f:'vent.', a:'auto' };
+        html += `<div class="act-card${isOn ? ' ac-active' : ''}">
+            <span class="ac-icon${isOn ? ' active' : ''}">❄️</span>
+            <div class="ac-info">
+                <div class="ac-row">
+                    <span class="act-name">Climatizzatore</span>
+                    <span class="${isOn ? 'act-on' : 'act-off'}">${isOn ? 'ON' : 'OFF'}</span>
+                    ${ac.temp != null ? `<span class="act-sub">${ac.temp.toFixed ? ac.temp.toFixed(1) : ac.temp}°C</span>` : ''}
+                    ${isOn && ac.temp_target != null ? `<span class="act-sub">→${ac.temp_target}°C</span>` : ''}
+                    ${isOn && ac.mode ? `<span class="act-sub">${modeLabel[ac.mode] || ac.mode}</span>` : ''}
+                </div>
+                <div class="ac-thresholds">
+                    accende &gt;${ac.temp_on}° · spegne &lt;${ac.temp_off}°
+                </div>
+            </div>
         </div>`;
     }
 
