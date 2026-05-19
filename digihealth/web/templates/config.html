@@ -263,19 +263,17 @@ function renderActuators() {
                 <label>Local Key</label>
                 <input type="password" id="ac_local_key" value="${ac.local_key || ''}">
             </div>
-            <div class="field-row">
-                <label>Accendi se &gt;</label>
-                <div class="thr-readonly">
-                    <strong>${((cfg.thresholds||{}).temp||{}).tolerance ?? 26} °C</strong>
-                    <span style="flex:1; font-size:0.7rem">da Soglie → TEMP tolleranza</span>
-                    <a href="/thresholds" class="thr-link">Modifica soglie</a>
+            <div class="field-row cols-2">
+                <div>
+                    <label>Accendi se temp &gt;</label>
+                    <div class="field-group"><input type="number" id="ac_temp_on" value="${ac.temp_on ?? 26}" style="width:60px"><span class="field-unit">°C</span></div>
+                </div>
+                <div>
+                    <label>Spegni se temp &lt;</label>
+                    <div class="field-group"><input type="number" id="ac_temp_off" value="${ac.temp_off ?? 24}" style="width:60px"><span class="field-unit">°C</span></div>
                 </div>
             </div>
             <div class="field-row cols-3">
-                <div>
-                    <label>Spegni se &lt;</label>
-                    <div class="field-group"><input type="number" id="ac_temp_off" value="${ac.temp_off ?? 24}" style="width:60px"><span class="field-unit">°C</span></div>
-                </div>
                 <div>
                     <label>Target</label>
                     <div class="field-group"><input type="number" id="ac_temp_target" value="${ac.temp_target ?? 22}" style="width:60px"><span class="field-unit">°C</span></div>
@@ -290,15 +288,15 @@ function renderActuators() {
                         <option value="a"  ${ac.mode==='a'  ? 'selected':''}>Auto</option>
                     </select>
                 </div>
-            </div>
-            <div class="field-row">
-                <label>Velocità ventola</label>
-                <select id="ac_fan_speed" style="max-width:140px">
-                    <option value="auto"   ${ac.fan_speed==='auto'   ? 'selected':''}>Auto</option>
-                    <option value="low"    ${ac.fan_speed==='low'    ? 'selected':''}>Bassa</option>
-                    <option value="middle" ${ac.fan_speed==='middle' ? 'selected':''}>Media</option>
-                    <option value="high"   ${ac.fan_speed==='high'   ? 'selected':''}>Alta</option>
-                </select>
+                <div>
+                    <label>Ventola</label>
+                    <select id="ac_fan_speed">
+                        <option value="auto"   ${ac.fan_speed==='auto'   ? 'selected':''}>Auto</option>
+                        <option value="low"    ${ac.fan_speed==='low'    ? 'selected':''}>Bassa</option>
+                        <option value="middle" ${ac.fan_speed==='middle' ? 'selected':''}>Media</option>
+                        <option value="high"   ${ac.fan_speed==='high'   ? 'selected':''}>Alta</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -505,6 +503,7 @@ function collect() {
         device_id:   v('ac_device_id'),
         ip:          v('ac_ip'),
         local_key:   v('ac_local_key'),
+        temp_on:     n('ac_temp_on'),
         temp_off:    n('ac_temp_off'),
         temp_target: n('ac_temp_target'),
         mode:        v('ac_mode'),

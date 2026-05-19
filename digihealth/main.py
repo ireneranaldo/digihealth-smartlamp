@@ -44,6 +44,10 @@ def main():
     actuator_manager = ActuatorManager() if actuators_available else None
     web_manager = WebManager() if web_available and config.web.enabled else None
 
+    # Popola subito lo stato attuatori nella dashboard (senza aspettare il ciclo sensori)
+    if actuator_manager and web_manager:
+        web_manager.update_actuators(actuator_manager.get_status())
+
     # Start threads
     threads = []
 

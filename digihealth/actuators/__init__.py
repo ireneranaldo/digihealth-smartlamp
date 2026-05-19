@@ -53,8 +53,6 @@ class ActuatorManager:
             try:
                 from .tuya_ac import TuyaAC
                 ac_cfg = dict(config.actuators.tuya_ac)
-                if thr.get('temp', {}).get('tolerance') is not None:
-                    ac_cfg['temp_on'] = thr['temp']['tolerance']
                 a = TuyaAC(ac_cfg)
                 self.actuators.append(a)
                 self._actuator_map['tuya_ac'] = a
