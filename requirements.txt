@@ -2,9 +2,9 @@ Flask==3.0.0
 numpy==1.26.0
 PyAudio==0.2.14
 RPi.GPIO
-board
-neopixel
 adafruit-blinka
+adafruit-circuitpython-neopixel
+rpi_ws281x
 smbus2
 pyserial
 requests
