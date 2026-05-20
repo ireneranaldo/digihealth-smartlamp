@@ -48,14 +48,14 @@ actuators:
       #   ip: "192.168.1.192"
       #   enabled: false
   tuya_purifier:
-    enabled: false
+    enabled: true
     device_id: "30604337807d3a7f7eda"
     ip: "192.168.0.108"
     local_key: "EB/FoSq??wzH?xML"
     pm25_limit: 25
     co2_limit: 800
   tuya_ac:
-    enabled: false
+    enabled: true
     device_id: "bf189345591dfac26ehvvj"
     ip: "192.168.0.127"
     local_key: "v;-khIaItEN[+-v:"
