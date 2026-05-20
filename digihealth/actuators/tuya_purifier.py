@@ -1,3 +1,4 @@
+import time
 import tinytuya
 from typing import Dict, Any, Optional
 from ..logger import logger
@@ -22,6 +23,7 @@ class TuyaPurifier:
         self._is_on: Optional[bool] = None
         self._last_pm25: Optional[float] = None
         self._last_co2: Optional[float] = None
+        self._override_until: float = 0.0  # forzatura da alert
 
         try:
             self.device = tinytuya.OutletDevice(
@@ -38,9 +40,26 @@ class TuyaPurifier:
             self.device = None
             logger.warning(f"TuyaPurifier: init fallito: {e}")
 
+    def force_on(self, hold_seconds: float):
+        """Forza il purificatore ON da un alert, sospendendo il controllo
+        autonomo per hold_seconds (vedi guardia in update())."""
+        self._override_until = time.time() + max(0.0, hold_seconds)
+        if self.device is None:
+            return
+        try:
+            self.device.turn_on()
+            self._is_on = True
+            logger.info(f"TuyaPurifier: FORZATO ON da alert per {hold_seconds:.0f}s")
+        except Exception as e:
+            logger.warning(f"TuyaPurifier: errore force_on: {e}")
+
     def update(self, data: Dict[str, Any]):
         """Accende/spegne il purificatore in base a PM2.5 e CO2."""
         if self.device is None:
+            return
+
+        # Override da alert attivo: non toccare, lascia il dispositivo forzato.
+        if time.time() < self._override_until:
             return
 
         pm25 = data.get('PM2_5-Particolato-[µg/m^3]', 0)
@@ -71,6 +90,7 @@ class TuyaPurifier:
             'is_on': self._is_on or False,
             'pm25': self._last_pm25,
             'co2': self._last_co2,
+            'override_active': time.time() < self._override_until,
         }
 
     def _log_device_status(self):

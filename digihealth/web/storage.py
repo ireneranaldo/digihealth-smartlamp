@@ -32,10 +32,12 @@ CREATE TABLE IF NOT EXISTS alerts (
     trigger_value      REAL,
     level              TEXT,
     overall_status     TEXT,
+    dominant_pollutant TEXT,
     action_code        TEXT,
     recommended_action TEXT,
     urgency            TEXT,
     processed          INTEGER NOT NULL DEFAULT 0,
+    action_taken       TEXT,
     raw_json           TEXT NOT NULL
 );
 """
@@ -55,6 +57,11 @@ def init_db() -> None:
     """Crea la tabella se non esiste. Da chiamare all'avvio del WebManager."""
     with _lock, _connect() as conn:
         conn.execute(_SCHEMA)
+        # Migrazione: aggiunge colonne nuove a DB creati prima di questa versione.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(alerts)")}
+        for col in ("action_taken", "dominant_pollutant"):
+            if col not in cols:
+                conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} TEXT")
     logger.info(f"Storage alert inizializzato: {_db_path()}")
 
 
@@ -68,24 +75,29 @@ def save_alert(alert: NormalizedAlert) -> int:
                 received_at, event_type, schema_version, timestamp,
                 client_id, lampada, stanza, host,
                 trigger_metric, trigger_value, level, overall_status,
-                action_code, recommended_action, urgency, processed, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                dominant_pollutant, action_code, recommended_action, urgency,
+                processed, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
             """,
             (
                 received_at, alert.event_type, alert.schema_version, alert.timestamp,
                 alert.client_id, alert.lampada, alert.stanza, alert.host,
                 alert.trigger_metric, alert.trigger_value, alert.level, alert.overall_status,
-                alert.action_code, alert.recommended_action, alert.urgency,
+                alert.dominant_pollutant, alert.action_code, alert.recommended_action,
+                alert.urgency,
                 json.dumps(alert.raw, ensure_ascii=False),
             ),
         )
         return cur.lastrowid
 
 
-def mark_processed(alert_id: int) -> None:
-    """Marca un alert come gestito (azione locale eseguita)."""
+def mark_processed(alert_id: int, action_taken: Optional[str] = None) -> None:
+    """Marca un alert come gestito e registra l'azione eseguita."""
     with _lock, _connect() as conn:
-        conn.execute("UPDATE alerts SET processed = 1 WHERE id = ?", (alert_id,))
+        conn.execute(
+            "UPDATE alerts SET processed = 1, action_taken = ? WHERE id = ?",
+            (action_taken, alert_id),
+        )
 
 
 def list_alerts(limit: int = 50) -> List[Dict[str, Any]]:

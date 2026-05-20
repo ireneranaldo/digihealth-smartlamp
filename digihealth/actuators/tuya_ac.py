@@ -1,3 +1,4 @@
+import time
 import tinytuya
 from typing import Dict, Any, Optional
 from ..logger import logger
@@ -26,6 +27,7 @@ class TuyaAC:
         self.temp_key = config.get('temp_key', 'TEMP-[C]')
         self._is_on: Optional[bool] = None
         self._last_temp: Optional[float] = None
+        self._override_until: float = 0.0  # forzatura da alert
 
         try:
             self.device = tinytuya.OutletDevice(
@@ -42,9 +44,28 @@ class TuyaAC:
             self.device = None
             logger.warning(f"TuyaAC: init fallito: {e}")
 
+    def force_on(self, hold_seconds: float):
+        """Forza l'AC ON (in raffrescamento) da un alert, sospendendo il
+        controllo autonomo per hold_seconds (vedi guardia in update())."""
+        self._override_until = time.time() + max(0.0, hold_seconds)
+        if self.device is None:
+            return
+        try:
+            self.device.set_status({
+                '1': True, '19': self.mode, '5': self.fan_speed, '2': self.temp_target,
+            })
+            self._is_on = True
+            logger.info(f"TuyaAC: FORZATO ON da alert per {hold_seconds:.0f}s")
+        except Exception as e:
+            logger.warning(f"TuyaAC: errore force_on: {e}")
+
     def update(self, data: Dict[str, Any]):
         """Accende/spegne l'AC in base alla temperatura rilevata dai sensori."""
         if self.device is None:
+            return
+
+        # Override da alert attivo: non toccare, lascia il dispositivo forzato.
+        if time.time() < self._override_until:
             return
 
         raw = data.get(self.temp_key)
@@ -93,4 +114,5 @@ class TuyaAC:
             'temp_off': self.temp_off,
             'temp_target': self.temp_target,
             'mode': self.mode,
+            'override_active': time.time() < self._override_until,
         }

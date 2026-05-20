@@ -46,6 +46,8 @@ def main():
 
     # Popola subito lo stato attuatori nella dashboard (senza aspettare il ciclo sensori)
     if actuator_manager and web_manager:
+        # Collega gli attuatori al dispatcher: gli alert in arrivo all'API li azionano
+        web_manager.set_actuator_manager(actuator_manager)
         web_manager.update_actuators(actuator_manager.get_status())
 
     # Start threads

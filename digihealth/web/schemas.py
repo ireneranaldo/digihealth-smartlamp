@@ -36,9 +36,11 @@ class NormalizedAlert(BaseModel):
     trigger_value: Optional[float] = None
     level: Optional[str] = None
     overall_status: Optional[str] = None
+    dominant_pollutant: Optional[str] = None
     action_code: Optional[str] = None
     recommended_action: Optional[str] = None
     urgency: Optional[str] = None
+    action_due_minutes: Optional[float] = None
     raw: Dict[str, Any]
 
 
@@ -74,12 +76,18 @@ def parse_alert(payload: Dict[str, Any]) -> NormalizedAlert:
         trigger_value=_to_float(trigger.get("value", payload.get("trigger_valore"))),
         level=trigger.get("level", payload.get("level")),
         overall_status=current_status.get("overall_status", payload.get("overall_status")),
+        dominant_pollutant=current_status.get(
+            "dominant_pollutant", payload.get("dominant_pollutant")
+        ),
         # recommendation.* oppure campi flat
         action_code=recommendation.get("action_code", payload.get("action_code")),
         recommended_action=recommendation.get(
             "recommended_action", payload.get("recommended_action")
         ),
         urgency=recommendation.get("urgency", payload.get("urgency")),
+        action_due_minutes=_to_float(
+            recommendation.get("action_due_minutes", payload.get("action_due_minutes"))
+        ),
         raw=payload,
     )
 

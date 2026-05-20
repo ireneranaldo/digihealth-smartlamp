@@ -16,6 +16,8 @@ class NeoPixelController:
         self._last_color_hex = '#000000'
         self._last_iaqi = 0
         self._active = False
+        self._alert_until: float = 0.0          # forzatura colore da alert
+        self._alert_color: tuple = (255, 0, 0)
 
         try:
             import board
@@ -31,9 +33,34 @@ class NeoPixelController:
             logger.error(f"NeoPixel non disponibile (permessi?): {e}")
             logger.warning("LED disabilitati — il resto del sistema continua normalmente")
 
+    def set_alert(self, color: tuple, hold_seconds: float):
+        """Forza un colore di allarme da un alert, per hold_seconds.
+        L'effetto IAQI/circadiano riprende alla scadenza (vedi update())."""
+        self._alert_color = color
+        self._alert_until = time.time() + max(0.0, hold_seconds)
+        self._render_alert()
+        logger.info(f"NeoPixel: ALERT colore {self._alert_color} per {hold_seconds:.0f}s")
+
+    def _render_alert(self):
+        if self.pixels is None:
+            return
+        try:
+            self.pixels.fill(self._alert_color)
+            self.pixels.show()
+            self._active = True
+            self._last_color_hex = '#{:02x}{:02x}{:02x}'.format(*self._alert_color)
+        except Exception as e:
+            logger.error(f"NeoPixel set_alert: {e}")
+
     def update(self, data: Dict[str, Any]):
         if self.pixels is None:
             return  # nessun crash, sistema continua
+
+        # Override da alert attivo: mostra il colore di allarme e salta il resto.
+        if time.time() < self._alert_until:
+            self._render_alert()
+            return
+
         try:
             iaqi = data.get('IAQI', 0)
             lux  = data.get('lux-IntensitaLuminosa', 0)

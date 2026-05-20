@@ -243,6 +243,18 @@ def config_save():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ── Pagina log alert/azioni (LAN, non esposta dal tunnel) ─────────────────────
+@app.route('/alerts')
+def alerts_page():
+    return render_template('alerts.html')
+
+
+@app.route('/alerts/data')
+def alerts_data():
+    from . import storage
+    return jsonify({"alerts": storage.list_alerts(100)})
+
+
 # ── WebManager ────────────────────────────────────────────────────────────────
 class WebManager:
     def __init__(self):
@@ -257,6 +269,12 @@ class WebManager:
 
     def update_actuators(self, actuators_status: dict):
         state["actuators"] = actuators_status
+
+    def set_actuator_manager(self, actuator_manager):
+        """Collega l'ActuatorManager vivo al dispatcher dell'API di ingestion,
+        cosi' gli alert in arrivo possono azionare gli attuatori reali."""
+        from .api import dispatcher
+        dispatcher.bind(actuator_manager)
 
     def update_data(self, processed_data: dict):
         try:

@@ -1,8 +1,8 @@
 """Blueprint API di ingestion, esposto su internet via Cloudflare Tunnel.
 
 Riceve gli alert HTTP POST dal sistema esterno (predizione qualita' aria / CRM),
-li autentica (API key), li valida, li salva su SQLite e accoda l'azione locale
-(in v1 solo loggata dal dispatcher).
+li autentica (API key), li valida, li salva su SQLite ed esegue l'azione locale
+sugli attuatori tramite il dispatcher.
 """
 from flask import Blueprint, jsonify, request
 from ..logger import logger
@@ -13,7 +13,8 @@ from .dispatcher import ActionDispatcher
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
-_dispatcher = ActionDispatcher()
+# Istanza condivisa: WebManager.set_actuator_manager() la collega agli attuatori.
+dispatcher = ActionDispatcher()
 
 
 @api_bp.route("/health")
@@ -37,7 +38,7 @@ def receive_alert():
         return jsonify({"status": "error", "message": "Payload non valido", "details": e.errors()}), 400
 
     alert_id = storage.save_alert(alert)
-    _dispatcher.dispatch(alert, alert_id)
+    dispatcher.dispatch(alert, alert_id)
 
     logger.info(
         f"Alert ricevuto id={alert_id} type={alert.event_type} "

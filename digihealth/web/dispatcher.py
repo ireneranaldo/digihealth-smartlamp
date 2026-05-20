@@ -1,56 +1,104 @@
 """Dispatch delle azioni locali a partire dagli alert ricevuti.
 
-VERSIONE v1 (STUB): non aziona ancora nessun dispositivo. Determina quali
-attuatori sarebbero coinvolti (leggendoli da config.actuators) e logga
-l'azione che verrebbe eseguita. Il wiring reale verso le API dei dispositivi
-sara' aggiunto in un secondo momento, agganciandolo a `_execute`.
+Mappa ogni alert (per `dominant_pollutant` + `level`) in azioni sugli attuatori
+reali gestiti dall'ActuatorManager (stesso processo del web).
+
+Conflitto col controllo autonomo: ogni azione "forza" il dispositivo per una
+durata (`action_due_minutes` del payload, fallback DEFAULT_HOLD_MIN minuti).
+Durante la forzatura il ciclo sensori a 30s non tocca il dispositivo
+(vedi guardie `_override_until` / `_alert_until` negli attuatori).
 """
-from typing import Dict, List
-from ..config import config
+import time
+from typing import List, Optional
 from ..logger import logger
+from . import storage
 from .schemas import NormalizedAlert
+
+DEFAULT_HOLD_MIN = 15.0           # durata forzatura se l'alert non la specifica
+COLOR_CRITICAL = (255, 0, 0)      # rosso
+COLOR_WARNING = (255, 140, 0)     # arancione
+
+# Token per classificare l'inquinante dominante / la metrica scatenante.
+AIR_TOKENS = ("CO2", "TVOC", "PM", "CH2O", "FORMALDE", "O3", "NO2", "MONOSSIDO", "CO-")
+TEMP_TOKENS = ("TEMP", "TEMPERATURA")
 
 
 class ActionDispatcher:
-    """Mappa un alert -> azione su uno o piu' dispositivi locali configurati."""
+    """Traduce un alert in comandi sugli attuatori abilitati."""
 
     def __init__(self):
-        # Dispositivi disponibili: presi dalla configurazione (config.actuators).
-        self.devices: Dict[str, dict] = {}
-        for name in ("neopixel", "shelly", "tuya_ac", "tuya_purifier"):
-            cfg = getattr(config.actuators, name, {}) or {}
-            if cfg.get("enabled", False):
-                self.devices[name] = cfg
-        logger.info(f"ActionDispatcher: dispositivi configurati = {list(self.devices.keys())}")
+        self.actuator_manager = None  # iniettato da WebManager.set_actuator_manager
 
-    def _targets_for(self, alert: NormalizedAlert) -> List[str]:
-        """Quali dispositivi coinvolgere per questo alert.
+    def bind(self, actuator_manager):
+        self.actuator_manager = actuator_manager
+        devices = list(getattr(actuator_manager, "_actuator_map", {}).keys())
+        logger.info(f"ActionDispatcher: collegato all'ActuatorManager (dispositivi: {devices})")
 
-        v1: coinvolge tutti i dispositivi abilitati. La mappatura fine
-        action_code -> dispositivo verra' definita col wiring reale.
-        """
-        return list(self.devices.keys())
+    def _device(self, name: str):
+        """Istanza viva dell'attuatore, o None se non caricato/abilitato."""
+        if self.actuator_manager is None:
+            return None
+        return getattr(self.actuator_manager, "_actuator_map", {}).get(name)
+
+    @staticmethod
+    def _hold_seconds(alert: NormalizedAlert) -> float:
+        mins = alert.action_due_minutes if alert.action_due_minutes else DEFAULT_HOLD_MIN
+        return float(mins) * 60.0
+
+    @staticmethod
+    def _classify(alert: NormalizedAlert) -> str:
+        """'air' | 'temp' | '' in base a dominant_pollutant e metrica scatenante."""
+        blob = f"{alert.dominant_pollutant or ''} {alert.trigger_metric or ''}".upper()
+        if any(tok in blob for tok in TEMP_TOKENS):
+            return "temp"
+        if any(tok in blob for tok in AIR_TOKENS):
+            return "air"
+        return ""
 
     def dispatch(self, alert: NormalizedAlert, alert_id: int) -> dict:
-        """Gestisce l'alert. In v1 logga soltanto, senza azionare nulla."""
-        targets = self._targets_for(alert)
+        """Esegue le azioni per l'alert e registra l'esito su SQLite."""
+        hold = self._hold_seconds(alert)
+        level = (alert.level or "").upper()
+        category = self._classify(alert)
+        done: List[str] = []
+
+        # 1) Azione "fisica" in base all'inquinante dominante
+        if category == "air":
+            self._fire("tuya_purifier", "force_on", hold, done, "purificatore ON")
+        elif category == "temp":
+            self._fire("tuya_ac", "force_on", hold, done, "AC ON")
+
+        # 2) Segnale visivo in base alla gravità
+        if level == "CRITICAL":
+            self._fire_alert_color(COLOR_CRITICAL, hold, done, "NeoPixel rosso")
+        elif level in ("WARNING", "WARN"):
+            self._fire_alert_color(COLOR_WARNING, hold, done, "NeoPixel arancione")
+
+        summary = "; ".join(done) if done else "nessuna azione (dispositivo non disponibile o alert non mappato)"
         logger.info(
-            "[STUB azione] alert id=%s code=%s level=%s metrica=%s valore=%s "
-            "-> azione: %r | dispositivi target: %s (NON azionati - v1)",
-            alert_id,
-            alert.action_code,
-            alert.level,
-            alert.trigger_metric,
-            alert.trigger_value,
-            alert.recommended_action,
-            targets or "(nessuno configurato)",
+            "Alert id=%s code=%s level=%s dominant=%s -> %s (hold=%.0fs)",
+            alert_id, alert.action_code, alert.level, alert.dominant_pollutant, summary, hold,
         )
-        return {"dispatched": False, "stub": True, "targets": targets}
+        storage.mark_processed(alert_id, summary)
+        return {"action_taken": summary, "targets": done, "hold_seconds": hold}
 
-    def _execute(self, device: str, alert: NormalizedAlert):
-        """Punto di aggancio futuro per l'azionamento reale del dispositivo.
+    def _fire(self, device_name: str, method: str, hold: float,
+              done: List[str], label: str):
+        dev = self._device(device_name)
+        if dev is None or not hasattr(dev, method):
+            return
+        try:
+            getattr(dev, method)(hold)
+            done.append(label)
+        except Exception as e:
+            logger.warning(f"Dispatcher: errore su {device_name}.{method}: {e}")
 
-        Qui andra' la chiamata all'API locale (es. Shelly via HTTP usando
-        config.actuators.shelly.ip, o effetto sui NeoPixel). Non implementato in v1.
-        """
-        raise NotImplementedError("Azionamento dispositivi non ancora implementato (v1 stub)")
+    def _fire_alert_color(self, color: tuple, hold: float, done: List[str], label: str):
+        dev = self._device("neopixel")
+        if dev is None or not hasattr(dev, "set_alert"):
+            return
+        try:
+            dev.set_alert(color, hold)
+            done.append(label)
+        except Exception as e:
+            logger.warning(f"Dispatcher: errore su neopixel.set_alert: {e}")
