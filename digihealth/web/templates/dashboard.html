@@ -181,7 +181,6 @@
             <label for="volume-slider">Volume</label>
             <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
         </div>
-        <button id="exitBtn" class="btn btn-exit" onclick="exitApp()">Esci</button>
     </div>
 
     <div class="timer-panel">
@@ -203,7 +202,7 @@
 
 <script>
     function toggle() {
-        fetch('/toggle');
+        fetch('/toggle', { method: 'POST' });
     }
 
     function runCalibration() {
@@ -214,7 +213,7 @@
         btn.disabled = true;
         btn.style.opacity = "0.5";
 
-        fetch('/calibrate')
+        fetch('/calibrate', { method: 'POST' })
             .then(res => res.json())
             .then(data => {
                 if(data.error) {
@@ -228,18 +227,6 @@
                 btn.disabled = false;
                 btn.style.opacity = "1";
             });
-    }
-
-    function exitApp() {
-        // window.close();
-        // setTimeout(() => {
-        //    if (!window.closed) {
-        //        alert('Se il browser non si chiude automaticamente, premi Alt+F4 oppure usa il comando di chiusura del kiosk.');
-        //    }
-        // }, 250);
-        
-        // Invia un comando al server Flask per chiudere il browser
-        fetch('/shutdown_kiosk');
     }
 
     // Gestione del volume

@@ -1,0 +1,25 @@
+# Secrets / configurazione locale
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+venv/
+.venv/
+
+# Database / log locali
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

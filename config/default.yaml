@@ -43,10 +43,16 @@ actuators:
 communicator:
   telegraf:
     enabled: true
+    # Il token NON va qui: si legge da INFLUXDB_TOKEN nell'ambiente (.env)
+    url: "https://influxdb1.digisense.it"
+    org: "Digiplus"
+    bucket: "health_data"
     measurement: "ZPHSensor_sensore"
     tags:
       sensor: "ZPHS01B"
       host: "raspberry01"
+      lampada: "AS00000046"
+      stanza: "UfficioDigiplus"
   ipc:
     method: "sqlite"  # or "redis"
     db_path: "/tmp/digihealth.db"

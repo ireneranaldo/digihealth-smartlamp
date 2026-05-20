@@ -11,4 +11,6 @@ requests
 telegraf-pyplug
 pydantic
 pyyaml
+python-dotenv
+influxdb-client
 pytest
