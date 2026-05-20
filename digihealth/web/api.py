@@ -4,6 +4,7 @@ Riceve gli alert HTTP POST dal sistema esterno (predizione qualita' aria / CRM),
 li autentica (API key), li valida, li salva su SQLite ed esegue l'azione locale
 sugli attuatori tramite il dispatcher.
 """
+import threading
 from flask import Blueprint, jsonify, request
 from ..logger import logger
 from .auth import require_api_key
@@ -38,7 +39,13 @@ def receive_alert():
         return jsonify({"status": "error", "message": "Payload non valido", "details": e.errors()}), 400
 
     alert_id = storage.save_alert(alert)
-    dispatcher.dispatch(alert, alert_id)
+
+    # Azione sugli attuatori in background: i comandi ai device Tuya via LAN
+    # possono richiedere qualche secondo, ma al mittente rispondiamo subito 2xx.
+    threading.Thread(
+        target=dispatcher.dispatch, args=(alert, alert_id),
+        daemon=True, name=f"dispatch-{alert_id}",
+    ).start()
 
     logger.info(
         f"Alert ricevuto id={alert_id} type={alert.event_type} "
