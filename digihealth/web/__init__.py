@@ -310,3 +310,13 @@ class WebManager:
 
         app.run(host=self.host, port=self.port,
                 debug=False, use_reloader=False, threaded=True)
+
+
+# ── API di ingestion (esposta via Cloudflare Tunnel) ──────────────────────────
+# Aggiunge gli endpoint /api/* (ricezione alert) all'app esistente, senza
+# toccare dashboard, /config e /thresholds.
+from . import storage as _ingestion_storage
+from .api import api_bp as _api_bp
+
+_ingestion_storage.init_db()
+app.register_blueprint(_api_bp)

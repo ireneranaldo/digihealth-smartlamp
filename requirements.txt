@@ -13,9 +13,9 @@ PyAudio>=0.2.14          # su Windows: pip install pyaudio (o pipwin)
 # Hardware Raspberry Pi (non richiesti su Windows)
 # ──────────────────────────────────────────────
 RPi.GPIO
-board
-neopixel
 adafruit-blinka
+adafruit-circuitpython-neopixel
+rpi_ws281x
 smbus2
 pyserial
 
@@ -40,6 +40,7 @@ influxdb-client
 # ──────────────────────────────────────────────
 pydantic>=2.0.0
 pyyaml>=6.0
+python-dotenv
 
 # ──────────────────────────────────────────────
 # Test
@@ -52,6 +53,6 @@ pytest
 #   pip install flask pyyaml pydantic requests tinytuya numpy
 #   pip install pyaudio          # oppure: pipwin install pyaudio
 #
-# I pacchetti RPi.GPIO / board / neopixel / adafruit-blinka
-# non sono necessari su Windows e possono essere ignorati.
+# I pacchetti RPi.GPIO / adafruit-blinka / adafruit-circuitpython-neopixel /
+# rpi_ws281x non sono necessari su Windows e possono essere ignorati.
 # ──────────────────────────────────────────────

@@ -7,6 +7,16 @@ __pycache__/
 dist/
 build/
 
+# Secrets (mai committare il .env reale)
+.env
+*.env
+!.env.example
+
+# Database SQLite locali
+*.db
+*.sqlite
+*.sqlite3
+
 # Virtual environment
 venv/
 .venv/
