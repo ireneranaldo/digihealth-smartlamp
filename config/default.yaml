@@ -76,6 +76,7 @@ communicator:
     measurement: "ZPHSensor_sensore"
     tags:
       sensor: "ZPHS01B"
+      client_id: "57"
       host: "raspberry01"
       lampada: "AS00000046"
       stanza: "UfficioDigiplus"
