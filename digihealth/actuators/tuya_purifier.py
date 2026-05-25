@@ -20,6 +20,7 @@ class TuyaPurifier:
     def __init__(self, config: Dict[str, Any]):
         self.pm25_limit = config.get('pm25_limit', 25)
         self.co2_limit = config.get('co2_limit', 800)
+        self._ip = config.get('ip', '?')
         self._is_on: Optional[bool] = None
         self._last_pm25: Optional[float] = None
         self._last_co2: Optional[float] = None
@@ -33,12 +34,12 @@ class TuyaPurifier:
             )
             self.device.set_version(3.3)
             logger.info(
-                f"TuyaPurifier: pronto ({config['ip']}) "
+                f"TuyaPurifier[{self._ip}]: pronto "
                 f"— soglie PM2.5>{self.pm25_limit} CO2>{self.co2_limit}"
             )
         except Exception as e:
             self.device = None
-            logger.warning(f"TuyaPurifier: init fallito: {e}")
+            logger.warning(f"TuyaPurifier[{self._ip}]: init fallito: {e}")
 
     def force_on(self, hold_seconds: float):
         """Forza il purificatore ON da un alert, sospendendo il controllo
@@ -49,9 +50,9 @@ class TuyaPurifier:
         try:
             self.device.turn_on()
             self._is_on = True
-            logger.info(f"TuyaPurifier: FORZATO ON da alert per {hold_seconds:.0f}s")
+            logger.info(f"TuyaPurifier[{self._ip}]: FORZATO ON da alert per {hold_seconds:.0f}s")
         except Exception as e:
-            logger.warning(f"TuyaPurifier: errore force_on: {e}")
+            logger.warning(f"TuyaPurifier[{self._ip}]: errore force_on: {e}")
 
     def update(self, data: Dict[str, Any]):
         """Accende/spegne il purificatore in base a PM2.5 e CO2."""
@@ -77,13 +78,13 @@ class TuyaPurifier:
         try:
             if deve_accendersi:
                 self.device.turn_on()
-                logger.info(f"TuyaPurifier: ACCESO — PM2.5={pm25} CO2={co2}")
+                logger.info(f"TuyaPurifier[{self._ip}]: ACCESO — PM2.5={pm25} CO2={co2}")
             else:
                 self.device.turn_off()
-                logger.info(f"TuyaPurifier: SPENTO — PM2.5={pm25} CO2={co2}")
+                logger.info(f"TuyaPurifier[{self._ip}]: SPENTO — PM2.5={pm25} CO2={co2}")
             self._is_on = deve_accendersi
         except Exception as e:
-            logger.warning(f"TuyaPurifier: errore comando: {e}")
+            logger.warning(f"TuyaPurifier[{self._ip}]: errore comando: {e}")
 
     def get_status(self) -> dict:
         return {
@@ -103,8 +104,8 @@ class TuyaPurifier:
                 speed = dps.get('3', '?')
                 pm25_interno = dps.get('5', '?')
                 logger.debug(
-                    f"TuyaPurifier stato: power={power} speed={speed} "
+                    f"TuyaPurifier[{self._ip}] stato: power={power} speed={speed} "
                     f"PM2.5_interno={pm25_interno}"
                 )
         except Exception:
-            logger.debug("TuyaPurifier: stato non disponibile")
+            logger.debug(f"TuyaPurifier[{self._ip}]: stato non disponibile")

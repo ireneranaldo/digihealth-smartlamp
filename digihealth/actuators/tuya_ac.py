@@ -25,6 +25,7 @@ class TuyaAC:
         self.mode = config.get('mode', 'c')
         self.fan_speed = config.get('fan_speed', 'auto')
         self.temp_key = config.get('temp_key', 'TEMP-[C]')
+        self._ip = config.get('ip', '?')
         self._is_on: Optional[bool] = None
         self._last_temp: Optional[float] = None
         self._override_until: float = 0.0  # forzatura da alert
@@ -37,12 +38,12 @@ class TuyaAC:
             )
             self.device.set_version(3.4)
             logger.info(
-                f"TuyaAC: pronto ({config['ip']}) "
+                f"TuyaAC[{self._ip}]: pronto "
                 f"— accensione>{self.temp_on}°C spegnimento<{self.temp_off}°C"
             )
         except Exception as e:
             self.device = None
-            logger.warning(f"TuyaAC: init fallito: {e}")
+            logger.warning(f"TuyaAC[{self._ip}]: init fallito: {e}")
 
     def force_on(self, hold_seconds: float):
         """Forza l'AC ON (in raffrescamento) da un alert, sospendendo il
@@ -55,9 +56,9 @@ class TuyaAC:
                 '1': True, '19': self.mode, '5': self.fan_speed, '2': self.temp_target,
             })
             self._is_on = True
-            logger.info(f"TuyaAC: FORZATO ON da alert per {hold_seconds:.0f}s")
+            logger.info(f"TuyaAC[{self._ip}]: FORZATO ON da alert per {hold_seconds:.0f}s")
         except Exception as e:
-            logger.warning(f"TuyaAC: errore force_on: {e}")
+            logger.warning(f"TuyaAC[{self._ip}]: errore force_on: {e}")
 
     def update(self, data: Dict[str, Any]):
         """Accende/spegne l'AC in base alla temperatura rilevata dai sensori."""
@@ -70,7 +71,7 @@ class TuyaAC:
 
         raw = data.get(self.temp_key)
         if raw is None:
-            logger.debug(f"TuyaAC: chiave '{self.temp_key}' non trovata nei dati sensori")
+            logger.debug(f"TuyaAC[{self._ip}]: chiave '{self.temp_key}' non trovata nei dati sensori")
             return
 
         try:
@@ -98,13 +99,13 @@ class TuyaAC:
                     '2': self.temp_target,
                 }
                 self.device.set_status({str(k): v for k, v in payload.items()})
-                logger.info(f"TuyaAC: ACCESO — temp={temp}°C (>{self.temp_on}°C)")
+                logger.info(f"TuyaAC[{self._ip}]: ACCESO — temp={temp}°C (>{self.temp_on}°C)")
             else:
                 self.device.set_value('1', False)
-                logger.info(f"TuyaAC: SPENTO — temp={temp}°C (<{self.temp_off}°C)")
+                logger.info(f"TuyaAC[{self._ip}]: SPENTO — temp={temp}°C (<{self.temp_off}°C)")
             self._is_on = deve_accendersi
         except Exception as e:
-            logger.warning(f"TuyaAC: errore comando: {e}")
+            logger.warning(f"TuyaAC[{self._ip}]: errore comando: {e}")
 
     def get_status(self) -> dict:
         return {
