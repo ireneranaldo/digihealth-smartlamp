@@ -1,8 +1,14 @@
 import time
 import datetime
 import math
-from typing import Dict, Any
+import threading
+from typing import Dict, Any, Optional
 from ..logger import logger
+
+# Durata del lampeggio quando arriva un alert (secondi).
+ALERT_BLINK_DURATION_S = 5.0
+# Periodo ON/OFF: 0.25s -> 2 Hz, ben visibile.
+ALERT_BLINK_PERIOD_S = 0.25
 
 class NeoPixelController:
 
@@ -16,8 +22,10 @@ class NeoPixelController:
         self._last_color_hex = '#000000'
         self._last_iaqi = 0
         self._active = False
-        self._alert_until: float = 0.0          # forzatura colore da alert
+        self._alert_until: float = 0.0          # blocca update() durante il blink
         self._alert_color: tuple = (255, 0, 0)
+        self._blink_thread: Optional[threading.Thread] = None
+        self._blink_stop = threading.Event()
 
         try:
             import board
@@ -34,31 +42,59 @@ class NeoPixelController:
             logger.warning("LED disabilitati — il resto del sistema continua normalmente")
 
     def set_alert(self, color: tuple, hold_seconds: float):
-        """Forza un colore di allarme da un alert, per hold_seconds.
-        L'effetto IAQI/circadiano riprende alla scadenza (vedi update())."""
-        self._alert_color = color
-        self._alert_until = time.time() + max(0.0, hold_seconds)
-        self._render_alert()
-        logger.info(f"NeoPixel: ALERT colore {self._alert_color} per {hold_seconds:.0f}s")
-
-    def _render_alert(self):
+        """Avvia un lampeggio del colore di allarme per ALERT_BLINK_DURATION_S
+        secondi; alla fine update() riprende il pattern IAQI/circadiano.
+        Il parametro hold_seconds e' ignorato (mantenuto per compatibilita'
+        di firma con gli altri attuatori)."""
         if self.pixels is None:
             return
+
+        # Ferma un eventuale lampeggio precedente prima di partire col nuovo.
+        if self._blink_thread and self._blink_thread.is_alive():
+            self._blink_stop.set()
+            self._blink_thread.join(timeout=0.5)
+        self._blink_stop.clear()
+
+        self._alert_color = color
+        # Margine extra cosi' update() non interferisce nemmeno se il thread
+        # tarda a pulire _alert_until per qualche millisecondo.
+        self._alert_until = time.time() + ALERT_BLINK_DURATION_S + 0.5
+
+        self._blink_thread = threading.Thread(
+            target=self._blink_alert,
+            args=(color, ALERT_BLINK_DURATION_S),
+            daemon=True,
+            name="NeoPixelBlink",
+        )
+        self._blink_thread.start()
+        logger.info(f"NeoPixel: ALERT lampeggio {color} per {ALERT_BLINK_DURATION_S:.0f}s")
+
+    def _blink_alert(self, color: tuple, duration: float):
+        end = time.time() + duration
+        on = True
         try:
-            self.pixels.fill(self._alert_color)
-            self.pixels.show()
-            self._active = True
-            self._last_color_hex = '#{:02x}{:02x}{:02x}'.format(*self._alert_color)
-        except Exception as e:
-            logger.error(f"NeoPixel set_alert: {e}")
+            while time.time() < end and not self._blink_stop.is_set():
+                try:
+                    self.pixels.fill(color if on else (0, 0, 0))
+                    self.pixels.show()
+                    self._active = on
+                    rgb = color if on else (0, 0, 0)
+                    self._last_color_hex = '#{:02x}{:02x}{:02x}'.format(*rgb)
+                except Exception as e:
+                    logger.error(f"NeoPixel blink: {e}")
+                    break
+                on = not on
+                time.sleep(ALERT_BLINK_PERIOD_S)
+        finally:
+            # Sblocca update() che ripristinera' il pattern normale.
+            self._alert_until = 0.0
 
     def update(self, data: Dict[str, Any]):
         if self.pixels is None:
             return  # nessun crash, sistema continua
 
-        # Override da alert attivo: mostra il colore di allarme e salta il resto.
+        # Durante il lampeggio i pixel sono gestiti dal thread di blink.
         if time.time() < self._alert_until:
-            self._render_alert()
             return
 
         try:
