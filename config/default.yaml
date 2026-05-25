@@ -50,14 +50,14 @@ actuators:
   tuya_purifier:
     enabled: true
     device_id: "30604337807d3a7f7eda"
-    ip: "192.168.0.108"
+    ip: "192.168.0.100"
     local_key: "EB/FoSq??wzH?xML"
     pm25_limit: 25
     co2_limit: 800
   tuya_ac:
     enabled: true
     device_id: "bf189345591dfac26ehvvj"
-    ip: "192.168.0.127"
+    ip: "192.168.0.101"
     local_key: "v;-khIaItEN[+-v:"
     temp_on: 26      # accende se temp > 26°C
     temp_off: 24     # spegne se temp < 24°C
