@@ -93,6 +93,20 @@
         }
         .btn-exit:hover { opacity: 0.9; }
 
+        /* Badge codice lampada nella barra dei bottoni */
+        .device-id {
+            margin-right: auto;
+            display: flex; align-items: baseline; gap: 6px;
+            font-size: 0.72rem;
+            color: rgba(77,60,47,0.55);
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.35);
+            border: 1px solid rgba(208,170,132,0.35);
+            border-radius: 999px;
+        }
+        .device-id .device-label { letter-spacing: 0.5px; text-transform: uppercase; font-size: 0.65rem; }
+        .device-id .device-code  { font-weight: 700; letter-spacing: 1px; color: var(--text-light); }
+
         .audio-block { display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; }
         .audio-block label { color: #aaa; font-size: 0.72rem; }
         .audio-toggle { display: flex; gap: 6px; }
@@ -475,6 +489,10 @@
 
         <!-- riga bottoni -->
         <div class="btn-row">
+            <div class="device-id">
+                <span class="device-label">Codice lampada</span>
+                <span class="device-code">AS00000046</span>
+            </div>
             <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
             <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
             <button class="btn btn-exit" onclick="window.location='/config'">Config</button>
