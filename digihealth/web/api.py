@@ -63,7 +63,8 @@ def receive_alert():
     incoming = (alert.lampada or "").strip()
     if incoming and incoming.upper() != EXPECTED_LAMPADA.upper():
         storage.mark_processed(alert_id, action_taken=f"ignored:device_mismatch({incoming})")
-        logger.info(
+        # Volutamente DEBUG: il log INFO mostra solo gli alert per questa lampada.
+        logger.debug(
             f"Alert id={alert_id} ignorato: lampada={incoming!r} "
             f"!= atteso {EXPECTED_LAMPADA!r} (da {client_ip})"
         )
