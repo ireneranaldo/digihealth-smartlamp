@@ -17,6 +17,10 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 # Istanza condivisa: WebManager.set_actuator_manager() la collega agli attuatori.
 dispatcher = ActionDispatcher()
 
+# ID hardcoded della lampada gestita da questo Raspberry. Gli alert con
+# campo "lampada" diverso vengono salvati ma non azionano gli attuatori.
+EXPECTED_LAMPADA = "AS00000046"
+
 
 @api_bp.route("/health")
 def health():
@@ -39,6 +43,21 @@ def receive_alert():
         return jsonify({"status": "error", "message": "Payload non valido", "details": e.errors()}), 400
 
     alert_id = storage.save_alert(alert)
+
+    # Filtro dispositivo: ignoriamo gli alert destinati ad altre lampade.
+    # Se il payload non specifica "lampada" lo lasciamo passare (compatibilita').
+    incoming = (alert.lampada or "").strip()
+    if incoming and incoming.upper() != EXPECTED_LAMPADA.upper():
+        storage.mark_processed(alert_id, action_taken=f"ignored:device_mismatch({incoming})")
+        logger.info(
+            f"Alert id={alert_id} ignorato: lampada={incoming!r} "
+            f"!= atteso {EXPECTED_LAMPADA!r}"
+        )
+        return jsonify({
+            "status": "ignored",
+            "reason": "device_mismatch",
+            "id": alert_id,
+        }), 200
 
     # Azione sugli attuatori in background: i comandi ai device Tuya via LAN
     # possono richiedere qualche secondo, ma al mittente rispondiamo subito 2xx.
