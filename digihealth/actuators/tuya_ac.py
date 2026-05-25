@@ -52,13 +52,34 @@ class TuyaAC:
         if self.device is None:
             return
         try:
-            self.device.set_status({
-                '1': True, '19': self.mode, '5': self.fan_speed, '2': self.temp_target,
-            })
-            self._is_on = True
-            logger.info(f"TuyaAC[{self._ip}]: FORZATO ON da alert per {hold_seconds:.0f}s")
+            # Multi-DPS in un unico set_status non e' affidabile su questo
+            # modello (alcune chiamate restituiscono None o spengono il
+            # device). Inviamo i DPS uno alla volta. fan_speed e' lasciata
+            # a quella impostata dal telecomando perche' 'auto' non e'
+            # accettato.
+            ok = self._send_dp('1', True, 'power on')
+            self._send_dp('19', self.mode, f'mode={self.mode}')
+            self._send_dp('2', self.temp_target, f'target={self.temp_target}')
+            if ok:
+                self._is_on = True
+                logger.info(f"TuyaAC[{self._ip}]: FORZATO ON da alert per {hold_seconds:.0f}s")
+            else:
+                logger.warning(f"TuyaAC[{self._ip}]: force_on, device non ha confermato accensione")
         except Exception as e:
             logger.warning(f"TuyaAC[{self._ip}]: errore force_on: {e}")
+
+    def _send_dp(self, dp: str, value, label: str) -> bool:
+        """Invia un singolo DP e ritorna True se il device ha confermato.
+        tinytuya restituisce un dict su successo, None su silenzio."""
+        try:
+            r = self.device.set_value(dp, value)
+            confirmed = isinstance(r, dict) and not r.get('Error')
+            if not confirmed:
+                logger.debug(f"TuyaAC[{self._ip}]: DP {dp}={value} non confermato ({label}, resp={r})")
+            return confirmed
+        except Exception as e:
+            logger.debug(f"TuyaAC[{self._ip}]: DP {dp}={value} eccezione: {e}")
+            return False
 
     def update(self, data: Dict[str, Any]):
         """Accende/spegne l'AC in base alla temperatura rilevata dai sensori."""
@@ -92,13 +113,11 @@ class TuyaAC:
 
         try:
             if deve_accendersi:
-                payload = {
-                    '1': True,
-                    '19': self.mode,
-                    '5': self.fan_speed,
-                    '2': self.temp_target,
-                }
-                self.device.set_status({str(k): v for k, v in payload.items()})
+                # Vedi force_on(): set_status multi-DPS non affidabile, usiamo
+                # set_value singoli.
+                self._send_dp('1', True, 'power on')
+                self._send_dp('19', self.mode, f'mode={self.mode}')
+                self._send_dp('2', self.temp_target, f'target={self.temp_target}')
                 logger.info(f"TuyaAC[{self._ip}]: ACCESO — temp={temp}°C (>{self.temp_on}°C)")
             else:
                 self.device.set_value('1', False)
