@@ -283,7 +283,17 @@ def alerts_page():
 @app.route('/alerts/data')
 def alerts_data():
     from . import storage
-    return jsonify({"alerts": storage.list_alerts(100)})
+    from .api import EXPECTED_LAMPADA
+    # Mostriamo solo gli alert destinati a questa lampada (o senza campo
+    # lampada, per compatibilita'). Gli altri restano su SQLite ma non
+    # vengono elencati in dashboard.
+    expected = EXPECTED_LAMPADA.upper()
+    rows = [
+        a for a in storage.list_alerts(200)
+        if not (a.get("lampada") or "").strip()
+        or (a.get("lampada") or "").strip().upper() == expected
+    ][:100]
+    return jsonify({"alerts": rows})
 
 
 # ── WebManager ────────────────────────────────────────────────────────────────
