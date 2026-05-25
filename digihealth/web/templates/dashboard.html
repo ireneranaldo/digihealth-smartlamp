@@ -412,7 +412,7 @@
             color: white;
             box-shadow: 0 8px 24px rgba(0,0,0,0.28);
             pointer-events: auto;
-            animation: toast-in 0.25s ease-out, toast-out 0.4s ease-in 7.5s forwards;
+            animation: toast-in 0.25s ease-out, toast-out 0.4s ease-in 3.5s forwards;
         }
         .toast-critical { background: linear-gradient(135deg, #d83333, #a51d1d); }
         .toast-warning  { background: linear-gradient(135deg, #e89a2c, #c87012); }
@@ -962,7 +962,7 @@ function showToast(ev) {
         `<div class="toast-body">${dom}${targets}${hold}</div>` +
         `<div class="toast-meta">alert id ${ev.id}${code}</div>`;
     stack.appendChild(toast);
-    setTimeout(() => toast.remove(), 8200);
+    setTimeout(() => toast.remove(), 4200);
 }
 
 function checkAlertEvent(ev) {
