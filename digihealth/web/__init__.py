@@ -51,6 +51,10 @@ _data_queue: multiprocessing.Queue   = None
 _audio_proc: multiprocessing.Process = None
 _cal_result = {"status": "idle"}
 
+# Riferimento all'ActuatorManager vivo, usato da /status per restituire lo
+# stato attuatori in tempo reale (vedi WebManager.set_actuator_manager).
+_actuator_manager = None
+
 
 # ── Queue reader (thread nel processo principale) ─────────────────────────────
 def _queue_reader():
@@ -90,6 +94,15 @@ def index():
 
 @app.route('/status')
 def get_status():
+    # Stato attuatori LIVE: legge dalle istanze in memoria (is_on,
+    # override_active, ecc. sono cached, niente I/O verso i device), cosi'
+    # le forzature da alert appaiono in dashboard immediatamente invece di
+    # aspettare il prossimo tick del main loop sensori (~30s).
+    if _actuator_manager is not None:
+        try:
+            state["actuators"] = _actuator_manager.get_status()
+        except Exception as e:
+            logger.debug(f"/status: get_status live fallito: {e}")
     return jsonify(state)
 
 
@@ -271,8 +284,10 @@ class WebManager:
         state["actuators"] = actuators_status
 
     def set_actuator_manager(self, actuator_manager):
-        """Collega l'ActuatorManager vivo al dispatcher dell'API di ingestion,
-        cosi' gli alert in arrivo possono azionare gli attuatori reali."""
+        """Collega l'ActuatorManager vivo al dispatcher dell'API di ingestion
+        e alla route /status per restituire stato in tempo reale."""
+        global _actuator_manager
+        _actuator_manager = actuator_manager
         from .api import dispatcher
         dispatcher.bind(actuator_manager)
 
