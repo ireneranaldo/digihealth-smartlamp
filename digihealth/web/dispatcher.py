@@ -75,6 +75,10 @@ class ActionDispatcher:
         elif level in ("WARNING", "WARN"):
             self._fire_alert_color(COLOR_WARNING, hold, done, "NeoPixel arancione")
 
+        # 3) Shelly: solo notifica in dashboard, niente azione fisica
+        #    (lampade smart sotto controllo autonomo circadiano)
+        done.append("Shelly notificata")
+
         summary = "; ".join(done) if done else "nessuna azione (dispositivo non disponibile o alert non mappato)"
         logger.info(
             "Alert id=%s code=%s level=%s dominant=%s -> %s (hold=%.0fs) (da %s)",
@@ -82,6 +86,15 @@ class ActionDispatcher:
             summary, hold, client_ip or "?",
         )
         storage.mark_processed(alert_id, summary)
+
+        # Pubblica l'evento per la dashboard (toast notification).
+        try:
+            from . import set_alert_event
+            set_alert_event(alert_id, alert.level, alert.dominant_pollutant,
+                            alert.action_code, done, hold)
+        except Exception as e:
+            logger.debug(f"Dispatcher: set_alert_event fallito: {e}")
+
         return {"action_taken": summary, "targets": done, "hold_seconds": hold}
 
     def _fire(self, device_name: str, method: str, hold: float,

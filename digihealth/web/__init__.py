@@ -43,7 +43,25 @@ state = {
     "noise_detected": False,
     "fft_active":     True,
     "actuators":      {},
+    # Ultimo evento di alert ricevuto e processato dal dispatcher.
+    # La dashboard lo legge per mostrare il toast. Schema:
+    # {ts, id, level, dominant_pollutant, action_code, targets[], hold_seconds}
+    "last_alert_event": None,
 }
+
+
+def set_alert_event(alert_id, level, dominant_pollutant, action_code, targets, hold_seconds):
+    """Pubblica un evento di alert per la dashboard (toast notification).
+    Chiamato dal dispatcher dopo l'esecuzione dell'azione."""
+    state["last_alert_event"] = {
+        "ts": time.time(),
+        "id": alert_id,
+        "level": level or "INFO",
+        "dominant_pollutant": dominant_pollutant or "",
+        "action_code": action_code or "",
+        "targets": list(targets) if targets else [],
+        "hold_seconds": float(hold_seconds) if hold_seconds else 0.0,
+    }
 
 # ── IPC ───────────────────────────────────────────────────────────────────────
 _cmd_queue:  multiprocessing.Queue   = None
