@@ -55,7 +55,8 @@ class ActionDispatcher:
             return "air"
         return ""
 
-    def dispatch(self, alert: NormalizedAlert, alert_id: int) -> dict:
+    def dispatch(self, alert: NormalizedAlert, alert_id: int,
+                 client_ip: Optional[str] = None) -> dict:
         """Esegue le azioni per l'alert e registra l'esito su SQLite."""
         hold = self._hold_seconds(alert)
         level = (alert.level or "").upper()
@@ -76,8 +77,9 @@ class ActionDispatcher:
 
         summary = "; ".join(done) if done else "nessuna azione (dispositivo non disponibile o alert non mappato)"
         logger.info(
-            "Alert id=%s code=%s level=%s dominant=%s -> %s (hold=%.0fs)",
-            alert_id, alert.action_code, alert.level, alert.dominant_pollutant, summary, hold,
+            "Alert id=%s code=%s level=%s dominant=%s -> %s (hold=%.0fs) (da %s)",
+            alert_id, alert.action_code, alert.level, alert.dominant_pollutant,
+            summary, hold, client_ip or "?",
         )
         storage.mark_processed(alert_id, summary)
         return {"action_taken": summary, "targets": done, "hold_seconds": hold}

@@ -22,6 +22,18 @@ dispatcher = ActionDispatcher()
 EXPECTED_LAMPADA = "AS00000046"
 
 
+def _client_ip() -> str:
+    """IP reale del mittente. Dietro Cloudflare Tunnel, request.remote_addr e'
+    127.0.0.1 (cloudflared locale): l'IP del client vero arriva in
+    CF-Connecting-IP. Fallback su X-Forwarded-For e poi remote_addr."""
+    return (
+        request.headers.get("CF-Connecting-IP")
+        or (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        or request.remote_addr
+        or "?"
+    )
+
+
 @api_bp.route("/health")
 def health():
     """Health check senza autenticazione (per monitor Cloudflare/uptime)."""
@@ -32,6 +44,8 @@ def health():
 @require_api_key
 def receive_alert():
     """Riceve un alert, lo logga su SQLite e accoda l'azione locale."""
+    client_ip = _client_ip()
+
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"status": "error", "message": "JSON body richiesto"}), 400
@@ -39,7 +53,7 @@ def receive_alert():
     try:
         alert = parse_alert(payload)
     except ValidationError as e:
-        logger.warning(f"Alert non valido da {request.remote_addr}: {e}")
+        logger.warning(f"Alert non valido da {client_ip}: {e}")
         return jsonify({"status": "error", "message": "Payload non valido", "details": e.errors()}), 400
 
     alert_id = storage.save_alert(alert)
@@ -51,7 +65,7 @@ def receive_alert():
         storage.mark_processed(alert_id, action_taken=f"ignored:device_mismatch({incoming})")
         logger.info(
             f"Alert id={alert_id} ignorato: lampada={incoming!r} "
-            f"!= atteso {EXPECTED_LAMPADA!r}"
+            f"!= atteso {EXPECTED_LAMPADA!r} (da {client_ip})"
         )
         return jsonify({
             "status": "ignored",
@@ -62,12 +76,12 @@ def receive_alert():
     # Azione sugli attuatori in background: i comandi ai device Tuya via LAN
     # possono richiedere qualche secondo, ma al mittente rispondiamo subito 2xx.
     threading.Thread(
-        target=dispatcher.dispatch, args=(alert, alert_id),
+        target=dispatcher.dispatch, args=(alert, alert_id, client_ip),
         daemon=True, name=f"dispatch-{alert_id}",
     ).start()
 
     logger.info(
         f"Alert ricevuto id={alert_id} type={alert.event_type} "
-        f"level={alert.level} action={alert.action_code} da {request.remote_addr}"
+        f"level={alert.level} action={alert.action_code} da {client_ip}"
     )
     return jsonify({"status": "received", "id": alert_id}), 200
