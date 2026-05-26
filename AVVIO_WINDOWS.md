@@ -8,7 +8,7 @@
 Se dovessi reinstallare le dipendenze:
 
 ```powershell
-pip install flask tinytuya pydantic pyyaml pyaudio pyserial numpy scipy
+pip install flask tinytuya pydantic pyyaml pyaudio pyserial numpy
 ```
 
 ## Comando di avvio
@@ -17,7 +17,7 @@ Apri PowerShell (o CMD) nella cartella del progetto ed esegui:
 
 ```powershell
 cd C:\Users\digip\Desktop\digihealth-smartlamp
-python -m digihealth.main
+.\venv\Scripts\python.exe -m digihealth.main
 ```
 
 ## Pagine web disponibili
@@ -43,7 +43,25 @@ Su Linux/Raspberry Pi viene usato `config/default.yaml`.
 - **TuyaAC**: attivo se `enabled: true` in `windows.yaml`
 - **TuyaPurifier**: disabilitato di default su Windows (`enabled: false`)
 - **Sensore ZPH01B**: disabilitato su Windows (porta seriale non disponibile)
-- **Microfono**: attivo, richiede dispositivo audio USB (device_index: 1)
+- **Microfono**: attivo, usa il microfono di default del sistema (`device_index: 1` = Microphone Array Realtek)
+
+## Microfono — trovare il device_index corretto
+
+Gli indici audio su Windows possono cambiare dopo un riavvio del PC.
+Se il microfono non funziona, esegui lo script di diagnostica:
+
+```powershell
+.\venv\Scripts\python.exe tools\find_audio_devices.py
+```
+
+Lo script mostra tutti i dispositivi disponibili e testa quali funzionano.
+Aggiorna poi `sensors.microphone.device_index` in `config/windows.yaml` con il valore corretto.
+
+## Audio comfort — rumore rosa
+
+Su Windows il rumore rosa viene riprodotto tramite `winsound` (nativo, nessun tool esterno necessario).
+I file audio MP3/WAV di comfort vengono riprodotti tramite `mpg123`, `vlc` o PowerShell MediaPlayer
+(il primo disponibile nel sistema viene usato automaticamente).
 
 ## Soglie (pagina `/thresholds`)
 

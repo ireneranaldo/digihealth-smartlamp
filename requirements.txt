@@ -11,6 +11,8 @@ PyAudio>=0.2.14          # su Windows: pip install pyaudio (o pipwin)
 
 # ──────────────────────────────────────────────
 # Hardware Raspberry Pi (non richiesti su Windows)
+# Audio su Linux richiede anche:
+#   sudo apt install mpg123 alsa-utils
 # ──────────────────────────────────────────────
 RPi.GPIO
 adafruit-blinka
@@ -55,4 +57,7 @@ pytest
 #
 # I pacchetti RPi.GPIO / adafruit-blinka / adafruit-circuitpython-neopixel /
 # rpi_ws281x non sono necessari su Windows e possono essere ignorati.
+#
+# Per trovare il device_index audio corretto su qualsiasi piattaforma:
+#   python3 tools/find_audio_devices.py
 # ──────────────────────────────────────────────

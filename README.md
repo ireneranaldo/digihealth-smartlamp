@@ -27,7 +27,7 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 - Sensore ZPH01B collegato a `/dev/serial0` (UART, 9600 baud)
 - Sensore BH1750 collegato a I2C bus 1, indirizzo `0x23`
 - Striscia NeoPixel (144 pixel) su GPIO 12
-- Microfono USB (`device_index: 1`)
+- Microfono USB (indice da verificare con `python3 tools/find_audio_devices.py`)
 - Connessione di rete (per Shelly, Tuya, InfluxDB, dashboard)
 
 ---
@@ -105,6 +105,8 @@ pip install pyaudio   # oppure: pip install pipwin && pipwin install pyaudio
 
 Il file di configurazione caricato automaticamente su Windows è `config/windows.yaml`.
 
+> Vedi [AVVIO_WINDOWS.md](AVVIO_WINDOWS.md) per dettagli su microfono e audio comfort su Windows.
+
 ---
 
 ## Configurazione
@@ -119,7 +121,8 @@ La configurazione è modificabile anche dalla **pagina web** `http://<ip>:5000/c
 ```yaml
 sensors:
   microphone:
-    device_index: 1          # verificare con arecord -l (Linux) o Device Manager (Windows)
+    device_index: 1          # Linux: verificare con arecord -l o tools/find_audio_devices.py
+    output_device_index: 0   # Linux: verificare con aplay -l; Windows: altoparlanti di default
 
 processors:
   audio_comfort:
@@ -213,7 +216,7 @@ digihealth-lamp/
 │   ├── main.py                     # Entry point, loop principale (ciclo 30s)
 │   ├── config.py                   # Caricamento e validazione config (Pydantic)
 │   ├── logger.py
-│   ├── audio_worker.py             # Processo separato per PyAudio
+│   ├── audio_worker.py             # Processo separato per PyAudio (spawn)
 │   ├── sensors/
 │   │   ├── base.py
 │   │   ├── zph.py                  # Sensore ZPH01B (UART)
@@ -238,6 +241,8 @@ digihealth-lamp/
 ├── config/
 │   ├── default.yaml                # Configurazione Raspberry Pi
 │   └── windows.yaml                # Configurazione Windows
+├── tools/
+│   └── find_audio_devices.py       # Diagnostica dispositivi audio (PyAudio + ALSA)
 ├── systemd/
 │   └── digihealth-lamp.service
 ├── audio/
@@ -271,7 +276,10 @@ Microfono USB ──┘                          │
 | `Serial: no such device /dev/serial0` | Abilitare UART in `raspi-config`, disabilitare console seriale |
 | `I2C error` / sensore luce non trovato | Verificare con `i2cdetect -y 1`; deve apparire `0x23` |
 | LED NeoPixel non si accendono | GPIO 12 richiede permessi root; verificare il cablaggio |
-| Microfono non trovato | Verificare `device_index` con `arecord -l`; usare `null` per auto-detect |
+| Microfono non trovato / `Invalid number of channels` | `device_index` errato: eseguire `python3 tools/find_audio_devices.py` per trovare l'indice corretto |
+| Microfono non trovato dopo riavvio (Windows) | Gli indici audio cambiano al riavvio: ri-eseguire `tools/find_audio_devices.py` e aggiornare `windows.yaml` |
+| Rumore rosa non si sente (Windows) | Verificare che `audio_worker.py` sia aggiornato: il watchdog non deve interferire con `winsound` |
+| Audio comfort: nessun suono su Linux | Verificare che `mpg123` sia installato: `sudo apt install mpg123` |
 | Dashboard non raggiungibile | Verificare `web.enabled: true` e che la porta 5000 sia aperta |
 | Shelly offline nel log | Verificare IP in config e che sia sulla stessa rete WiFi |
 | Tuya: `Connection refused` | Verificare IP e `local_key`; il dispositivo deve essere sulla LAN locale |
