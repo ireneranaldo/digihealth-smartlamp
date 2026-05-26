@@ -12,8 +12,10 @@ sensors:
   window:
     gpio_pin: 17
   microphone:
-    enabled: false  #non presente
-    device_index: null  # Auto-detect
+    enabled: true
+    device_index: 1        # USB PnP Sound Device — da verificare con mic collegato
+    output_device_index: 0 # bcm2835 Headphones - jack output (hw:2,0)
+
 
 processors:
   iaqi:
@@ -21,11 +23,11 @@ processors:
   circadian:
     enabled: true
   audio_comfort:
-    enabled: true  #non presente
-    check_duration: 10
+    enabled: true
+    check_duration: 10      
     comfort_duration: 300
     tolerance_threshold: 45.0
-    critical_threshold: 65.0
+    critical_threshold: 55.0
 
 actuators:
   neopixel:
@@ -35,18 +37,49 @@ actuators:
     iaqi_range: [0, 79]
     circadian_range: [80, 143]
   shelly:
-    enabled: false #non presente
-    ip: "192.168.1.191"
-    username: ""
-    password: ""
+    enabled: true
+    # Aggiungere qui tutte le Shelly presenti in rete.
+    # Solo quelle con enabled: true verranno comandate.
+    devices:
+      - name: "Lampada1 Uff Sensorizzato"
+        ip: "192.168.1.191"
+        enabled: true
+      # - name: "Lampada Comodino"
+      #   ip: "192.168.1.192"
+      #   enabled: false
+  tuya_purifier:
+    enabled: true
+    device_id: "30604337807d3a7f7eda"
+    ip: "192.168.0.100"
+    local_key: "EB/FoSq??wzH?xML"
+    pm25_limit: 25
+    co2_limit: 800
+  tuya_ac:
+    enabled: true
+    device_id: "bf189345591dfac26ehvvj"
+    ip: "192.168.0.101"
+    local_key: "v;-khIaItEN[+-v:"
+    temp_on: 26      # accende se temp > 26°C
+    temp_off: 24     # spegne se temp < 24°C
+    temp_target: 22  # temperatura impostata sull'AC
+    mode: "c"        # c=cold | h=heat | d=dry | f=fan | a=auto
+    fan_speed: "auto"
+    temp_key: "TEMP-[C]"
 
 communicator:
   telegraf:
     enabled: true
+    # Il token NON va qui: si legge da INFLUXDB_TOKEN nell'ambiente (.env)
+    url: "https://influxdb1.digisense.it"
+    org: "Digiplus"
+    bucket: "health_data"
     measurement: "ZPHSensor_sensore"
     tags:
       sensor: "ZPHS01B"
+      client_id: "57"
       host: "raspberry01"
+      lampada: "AS00000046"
+      stanza: "UfficioDigiplus"
   ipc:
     method: "sqlite"  # or "redis"
     db_path: "/tmp/digihealth.db"
@@ -59,3 +92,41 @@ web:
 logging:
   level: "INFO"
   file: "/var/log/digihealth-lamp.log"
+
+thresholds:
+  co2:
+    tolerance: 801
+    critical: 1001
+  tvoc:
+    tolerance: 2
+    critical: 3
+  ch2o:
+    tolerance: 0.06
+    critical: 0.11
+  pm1:
+    tolerance: 10
+    critical: 20
+  pm25:
+    tolerance: 15
+    critical: 35
+  pm10:
+    tolerance: 45
+    critical: 90
+  co:
+    tolerance: 7
+    critical: 10
+  o3:
+    tolerance: 0.07
+    critical: 0.12
+  no2:
+    tolerance: 0.05
+    critical: 0.1
+  temp:
+    tolerance: 26
+    critical: 28.1
+  hum:
+    tolerance: 60
+    critical: 70.1
+  lux:
+    tolerance: 200
+    critical: 100

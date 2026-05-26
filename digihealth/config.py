@@ -2,6 +2,10 @@ import yaml
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import os
+from dotenv import load_dotenv
+
+# Carica le variabili da .env (se presente) prima di leggere i secret.
+load_dotenv()
 
 class SensorConfig(BaseModel):
     zph: Dict[str, Any] = Field(default_factory=dict)
@@ -18,6 +22,8 @@ class ProcessorConfig(BaseModel):
 class ActuatorConfig(BaseModel):
     neopixel: Dict[str, Any] = Field(default_factory=dict)
     shelly: Dict[str, Any] = Field(default_factory=dict)
+    tuya_purifier: Dict[str, Any] = Field(default_factory=dict)
+    tuya_ac: Dict[str, Any] = Field(default_factory=dict)
 
 class CommunicatorConfig(BaseModel):
     telegraf: Dict[str, Any] = Field(default_factory=dict)
@@ -32,6 +38,11 @@ class LoggingConfig(BaseModel):
     level: str = "INFO"
     file: Optional[str] = None
 
+class Secrets(BaseModel):
+    """Segreti caricati da variabili d'ambiente (mai da YAML/git)."""
+    influxdb_token: Optional[str] = Field(default_factory=lambda: os.getenv("INFLUXDB_TOKEN"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("DIGIHEALTH_API_KEY"))
+
 class DigiHealthConfig(BaseModel):
     sensors: SensorConfig = Field(default_factory=SensorConfig)
     processors: ProcessorConfig = Field(default_factory=ProcessorConfig)
@@ -39,6 +50,8 @@ class DigiHealthConfig(BaseModel):
     communicator: CommunicatorConfig = Field(default_factory=CommunicatorConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    thresholds: Dict[str, Any] = Field(default_factory=dict)
+    secrets: Secrets = Field(default_factory=Secrets)
 
 def load_config(config_path: str = "config/default.yaml") -> DigiHealthConfig:
     """Load configuration from YAML file."""
@@ -49,4 +62,10 @@ def load_config(config_path: str = "config/default.yaml") -> DigiHealthConfig:
     else:
         return DigiHealthConfig()
 
-config = load_config()
+import platform as _platform
+_default_cfg = (
+    "config/windows.yaml"
+    if _platform.system() == "Windows"
+    else "config/default.yaml"
+)
+config = load_config(os.environ.get('DIGIHEALTH_CONFIG', _default_cfg))

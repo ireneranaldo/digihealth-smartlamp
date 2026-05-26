@@ -2,81 +2,250 @@
     GUIDA GESTIONE SERVIZIO: DIGIHEALTH LAMP
 =====================================================
 
-Questo servizio (digihealth-lamp.service) gestisce l'avvio 
-automatico dello script Python per il monitoraggio 
-ambientale (IAQI, Lux, PM2.5, ecc.).
+Il servizio systemd (digihealth-lamp.service) gestisce l'avvio
+automatico del sistema di monitoraggio ambientale alla accensione
+della Raspberry Pi e ne garantisce il riavvio in caso di crash.
 
-Il servizio assicura che:
-1. Lo script parta da solo all'accensione della Raspberry.
-2. Lo script venga riavviato automaticamente in caso di crash.
-3. I dati vengano inviati costantemente a Telegraf/InfluxDB.
+Cosa fa il servizio:
+  1. Avvia automaticamente lo script Python all'accensione
+  2. Riavvia lo script automaticamente in caso di errore (dopo 5s)
+  3. Invia costantemente i dati a InfluxDB via influxdb-client
+  4. Aggiorna la striscia NeoPixel e la dashboard web
+  5. Controlla le lampadine Shelly (luce circadiana + dimming adattivo)
+  6. Controlla il purificatore PNI PTA200 (Tuya) in base a PM2.5/CO2
+  7. Controlla il climatizzatore Solight DAC-12000 (Tuya) in base alla temperatura
 
------------------------------------------------------
-1. COMANDI DI GESTIONE (DA TERMINALE)
------------------------------------------------------
+Percorsi:
+  Cartella progetto:  /home/digip/digihealth-lamp
+  File di servizio:   /etc/systemd/system/digihealth-lamp.service
+  Ambiente virtuale:  /home/digip/digihealth-lamp/venv/
+  Log di sistema:     journalctl -u digihealth-lamp
 
-VEDERE SE LA LAMPADA STA GIRANDO:
-sudo systemctl status digihealth-lamp.service
-
-AVVIARE IL SERVIZIO:
-sudo systemctl start digihealth-lamp.service
-
-FERMARE IL SERVIZIO:
-sudo systemctl stop digihealth-lamp.service
-
-RIAVVIARE IL SERVIZIO (es. dopo modifiche al codice):
-sudo systemctl restart digihealth-lamp.service
-
------------------------------------------------------
-2. AVVIO AUTOMATICO (BOOT)
------------------------------------------------------
-
-ATTIVARE l'avvio automatico all'accensione:
-sudo systemctl enable digihealth-lamp.service
-
-DISATTIVARE l'avvio automatico:
-sudo systemctl disable digihealth-lamp.service
+NOTA: Il file systemd/digihealth-lamp.service nel repository usa
+User=pi e WorkingDirectory=/home/pi/digihealth-lamp come defaults.
+Prima di installarlo, modificalo con il tuo utente (es. digip):
+  User=digip
+  WorkingDirectory=/home/digip/digihealth-lamp
+  ExecStart=/home/digip/digihealth-lamp/venv/bin/python3 -m digihealth.main
 
 -----------------------------------------------------
-3. VEDERE I DATI E I LOG IN TEMPO REALE
+1. STATO DEL SERVIZIO
 -----------------------------------------------------
 
-Per vedere i dati IAQI/Lux che lo script sta leggendo 
-mentre il servizio è attivo, usa questo comando:
+Vedere se la lampada sta girando:
+  sudo systemctl status digihealth-lamp.service
 
-sudo journalctl -u digihealth-lamp.service -f
-
-(Premi CTRL+C per uscire dalla visualizzazione dei log)
+Output atteso quando tutto funziona:
+  ● digihealth-lamp.service - DigiHealth Lamp Service
+     Active: active (running) since ...
 
 -----------------------------------------------------
-4. PERCORSI DEL PROGETTO
+2. AVVIO / ARRESTO / RIAVVIO
 -----------------------------------------------------
-Cartella progetto: /home/digip/digihealth-lamp
-File di Servizio:  /etc/systemd/system/digihealth-lamp.service
-Ambiente Virtuale: /home/digip/digihealth-lamp/venv/
+
+Avviare il servizio:
+  sudo systemctl start digihealth-lamp.service
+
+Fermare il servizio:
+  sudo systemctl stop digihealth-lamp.service
+
+Riavviare (es. dopo modifiche al codice o alla config):
+  sudo systemctl restart digihealth-lamp.service
+
+ALTERNATIVA WEB: dalla pagina http://<ip>:5000/config
+  clicca il bottone "Riavvia" — l'app si riavvia automaticamente
+  e la pagina si ricarica da sola entro pochi secondi.
+
+-----------------------------------------------------
+3. AVVIO AUTOMATICO AL BOOT
+-----------------------------------------------------
+
+Attivare l'avvio automatico all'accensione:
+  sudo systemctl enable digihealth-lamp.service
+
+Disattivare l'avvio automatico:
+  sudo systemctl disable digihealth-lamp.service
+
+Verificare se è abilitato:
+  sudo systemctl is-enabled digihealth-lamp.service
+
+-----------------------------------------------------
+4. LOG IN TEMPO REALE
+-----------------------------------------------------
+
+Seguire i log mentre il servizio è attivo (CTRL+C per uscire):
+  sudo journalctl -u digihealth-lamp.service -f
+
+Ultimi 100 log:
+  sudo journalctl -u digihealth-lamp.service -n 100
+
+Log dall'ultimo avvio del sistema:
+  sudo journalctl -u digihealth-lamp.service -b
+
+Log con timestamp precisi:
+  sudo journalctl -u digihealth-lamp.service -f --output=short-precise
+
+-----------------------------------------------------
+5. ESECUZIONE MANUALE PER DEBUG
+-----------------------------------------------------
+
+  1. Ferma il servizio se è attivo:
+       sudo systemctl stop digihealth-lamp.service
+
+  2. Entra nella cartella del progetto:
+       cd /home/digip/digihealth-lamp
+
+  3. Attiva l'ambiente virtuale:
+       source venv/bin/activate
+
+  4. Lancia lo script:
+       sudo ./venv/bin/python3 -m digihealth.main
+
+  Usa CTRL+C per fermarlo. NON usare CTRL+Z (lascia processi zombie).
+
+-----------------------------------------------------
+6. CONFIGURAZIONE VIA WEB (CONSIGLIATO)
+-----------------------------------------------------
+
+Apri http://<ip-raspberry>:5000/config nel browser.
+
+Dalla pagina di configurazione puoi:
+  - Abilitare/disabilitare ogni attuatore con un toggle
+  - Modificare IP, local_key, soglie di tutti i dispositivi
+  - Modificare le soglie audio, impostazioni web, log level
+
+Pulsanti:
+  [Salva]    → scrive il file YAML su disco
+  [Riavvia]  → riavvia l'applicazione e ricarica la pagina automaticamente
+
+NOTA: le modifiche sono attive solo dopo il riavvio.
+
+-----------------------------------------------------
+7. INSTALLAZIONE / AGGIORNAMENTO DEL SERVIZIO
+-----------------------------------------------------
+
+Prima installazione:
+  sudo cp systemd/digihealth-lamp.service /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable digihealth-lamp
+  sudo systemctl start digihealth-lamp
+
+Dopo aver modificato il file .service:
+  sudo systemctl daemon-reload
+  sudo systemctl restart digihealth-lamp.service
+
+Dopo aver modificato il codice Python:
+  sudo systemctl restart digihealth-lamp.service
+
+Dopo aver modificato config/default.yaml (o dalla pagina web):
+  sudo systemctl restart digihealth-lamp.service
+  (oppure clicca "Riavvia" nella pagina /config)
+
+-----------------------------------------------------
+8. ATTIVARE LE LAMPADINE SHELLY
+-----------------------------------------------------
+
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Shelly" attiva il toggle
+  3. Verifica l'IP del dispositivo
+  4. Clicca Salva → Riavvia
+
+Via file (alternativa):
+  1. Apri config/default.yaml
+  2. Imposta shelly.enabled: true
+  3. Aggiungi/modifica i dispositivi nella lista devices
+  4. Riavvia il servizio
+
+Logica circadiana:
+  07:00-15:59 → luce fredda (6500K)
+  16:00-06:59 → luce calda (2700K)
+  Luminosità:  adattiva in base al lux del sensore BH1750
+
+La dashboard mostra la lampadina con il colore reale (caldo/freddo)
+e l'intensità del glow in base alla brightness corrente.
+
+-----------------------------------------------------
+9. ATTIVARE IL PURIFICATORE TUYA (PNI PTA200)
+-----------------------------------------------------
+
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Tuya Purificatore" attiva il toggle
+  3. Verifica IP e local_key
+  4. Clicca Salva → Riavvia
+
+Logica di controllo:
+  PM2.5 > 25 µg/m³  OPPURE  CO2 > 800 ppm → ACCESO
+  Entrambi nei limiti → SPENTO
+  Protocollo Tuya: v3.3
+
+Trovare IP e local_key:
+  python -m tinytuya scan
+
+-----------------------------------------------------
+10. ATTIVARE IL CLIMATIZZATORE TUYA (SOLIGHT DAC-12000)
+-----------------------------------------------------
+
+Dispositivo: Solight DAC-12000 / Portable AC-WBR3
+  Device ID:   bf189345591dfac26ehvvj
+  IP locale:   192.168.0.127
+  Protocollo:  Tuya v3.4
+
+Via pagina web (consigliato):
+  1. Apri http://<ip>:5000/config
+  2. Nella sezione "Tuya Climatizzatore" attiva il toggle
+  3. Verifica IP e local_key
+  4. Imposta le soglie di temperatura
+  5. Clicca Salva → Riavvia
+
+Logica di controllo (isteresi):
+  temp > temp_on  (default 26°C) → AC ACCESO in modalità freddo
+  temp < temp_off (default 24°C) → AC SPENTO
+  Temperatura target: 22°C (impostata sull'AC all'accensione)
+
+Mappa DPS verificata sul dispositivo:
+  DPS 1  → power (bool)
+  DPS 2  → temperatura impostata (int, °C)
+  DPS 3  → temperatura attuale letta dall'AC (int, °C)
+  DPS 5  → velocità ventola (low/middle/high/auto)
+  DPS 19 → modalità (c=freddo, h=caldo, d=deumidifica, f=ventola, a=auto)
+
+Test rapido del dispositivo:
+  python -c "
+  import tinytuya
+  d = tinytuya.OutletDevice('bf189345591dfac26ehvvj', '192.168.0.127', 'v;-khIaItEN[+-v:')
+  d.set_version(3.4)
+  print(d.status())
+  "
+
+-----------------------------------------------------
+11. DASHBOARD WEB — STATO ATTUATORI
+-----------------------------------------------------
+
+La dashboard (http://<ip>:5000) mostra in tempo reale
+una riga con lo stato di ogni attuatore abilitato:
+
+  NeoPixel      → pallino colorato con il colore IAQI corrente
+  Shelly 💡     → lampadina con glow caldo/freddo e percentuale
+  Purificatore 🌀 → ON/OFF, ultimo valore PM2.5 e CO2
+  Climatizzatore ❄️ → ON/OFF, temperatura ambiente rilevata
+
+I widget appaiono solo per gli attuatori con enabled: true.
+
+-----------------------------------------------------
+12. SALVATAGGIO MODIFICHE CON GIT
+-----------------------------------------------------
+
+Dopo ogni modifica importante al codice o alla configurazione:
+
+  git add .
+  git commit -m "Descrizione breve della modifica"
+  git push
+
+Esempio di messaggi di commit utili:
+  "Fix soglia audio comfort a 45 dB"
+  "Aggiorna soglie AC: on=27 off=25"
+  "Abilita purificatore Tuya in produzione"
+
 =====================================================
-
------------------------------------------------------
-5. ESECUZIONE MANUALE PER TEST (DEBUG)
------------------------------------------------------
-Se vuoi vedere l'output direttamente nel terminale 
-senza usare il servizio systemd:
-
-1. Ferma il servizio se è attivo:
-   sudo systemctl stop digihealth-lamp.service
-
-2. Lancia lo script manualmente:
-   sudo ./venv/bin/python3 -m digihealth.main
-
-(Nota: Usa CTRL+C per fermarlo. Non usare CTRL+Z.)
------------------------------------------------------
-
-
-Ogni volta che farai una modifica importante alla tua lampada, ti basterà la "tripletta magica" per salvare tutto:
-
-git add .
-
-git commit -m "descrizione modifica"
-
-git push
-
