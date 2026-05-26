@@ -12,7 +12,7 @@ actuators:
     fan_speed: low
     device_id: bf189345591dfac26ehvvj
     ip: 192.168.0.127
-    local_key: v;-khIaItEN[+-v:
+    local_key: "v;-khIaItEN[+-v:"
     mode: c
     temp_key: TEMP-[C]
     temp_off: 19
@@ -27,7 +27,7 @@ actuators:
     pm25_limit: 25
 communicator:
   ipc:
-    db_path: null
+    db_path: "C:/Users/digip/AppData/Local/Temp/digihealth.db"
     method: sqlite
   telegraf:
     enabled: false
@@ -46,7 +46,7 @@ sensors:
   microphone:
     device_index: 1
     enabled: true
-    output_device_index: 2
+    output_device_index: 3
   zph:
     enabled: false
 thresholds:

@@ -13,8 +13,8 @@ sensors:
     gpio_pin: 17
   microphone:
     enabled: true
-    device_index: 1        # USB PnP Sound Device (hw:4,0)
-    output_device_index: 1 # bcm2835 Headphones - jack output (hw:2,0)
+    device_index: 1        # USB PnP Sound Device — da verificare con mic collegato
+    output_device_index: 0 # bcm2835 Headphones - jack output (hw:2,0)
 
 
 processors:

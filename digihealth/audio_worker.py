@@ -50,16 +50,31 @@ _winsound_on  = False   # True quando winsound sta suonando (solo Windows WAV)
 # ── Pink Noise 1/f via NumPy ──────────────────────────────────────────────────
 def _generate_pink_noise_wav():
     path = PINK_WAV
-    if os.path.isfile(path):
-        return path
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    n     = RATE * 10
+    # Rigenera sempre (ignora cache) per assicurare qualità aggiornata
+    os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+
+    # 60 secondi a 44100 Hz — loop quasi impercettibile
+    duration_s = 60
+    n = RATE * duration_s
+
+    # Pink noise via filtro Voss-McCartney approssimato su FFT
     white = np.random.randn(n)
     fft_w = np.fft.rfft(white)
     freqs = np.fft.rfftfreq(n)
     freqs[0] = 1e-6
-    pink  = np.fft.irfft(fft_w / np.sqrt(np.abs(freqs)), n=n)
-    pcm   = (pink / (np.max(np.abs(pink)) + 1e-9) * 0.15 * 32767).astype(np.int16)
+    pink = np.fft.irfft(fft_w / np.sqrt(np.abs(freqs)), n=n)
+
+    # Normalizza a ±1, poi scala a 60% di dinamica — abbastanza udibile
+    pink = pink / (np.max(np.abs(pink)) + 1e-9) * 0.60
+
+    # Crossfade 2 s sui bordi → elimina il click al loop
+    fade_len = RATE * 2
+    fade_in  = np.linspace(0.0, 1.0, fade_len)
+    fade_out = np.linspace(1.0, 0.0, fade_len)
+    pink[:fade_len]  *= fade_in
+    pink[-fade_len:] *= fade_out
+
+    pcm = (pink * 32767).astype(np.int16)
     with wave.open(path, 'w') as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -415,8 +430,9 @@ def audio_process_fn(cmd_q, data_q, cfg: dict):
                 mode      = "CHECK"
 
         # 4.5 Watchdog: riavvia audio se il processo è morto in COMFORT
+        # _winsound_on=True significa che winsound gestisce l'audio (nessun subprocess)
         if mode == "COMFORT" and last_mode == "COMFORT":
-            if _file_proc is None or _file_proc.poll() is not None:
+            if not _winsound_on and (_file_proc is None or _file_proc.poll() is not None):
                 log.warning("Watchdog: audio morto, riavvio")
                 comfort_file = PINK_WAV
                 if comfort_mode == "file" and audio_file:
