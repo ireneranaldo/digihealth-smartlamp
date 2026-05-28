@@ -1,132 +1,131 @@
-# DigiHealth Lamp Configuration
-sensors:
-  zph:
-    port: "/dev/serial0"
-    baudrate: 9600
-    command: [255, 1, 134, 0, 0, 0, 0, 0, 121]
-  light:
-    i2c_bus: 1
-    address: 0x23
-  door:
-    gpio_pin: 18
-  window:
-    gpio_pin: 17
-  microphone:
-    enabled: true
-    device_index: 1        # USB PnP Sound Device — da verificare con mic collegato
-    output_device_index: 0 # bcm2835 Headphones - jack output (hw:2,0)
-
-
-processors:
-  iaqi:
-    enabled: true
-  circadian:
-    enabled: true
-  audio_comfort:
-    enabled: true
-    check_duration: 10      
-    comfort_duration: 300
-    tolerance_threshold: 45.0
-    critical_threshold: 55.0
-
 actuators:
   neopixel:
-    enabled: true  #non presente
-    pin: 12
+    circadian_range:
+    - 80
+    - 143
+    enabled: true
+    iaqi_range:
+    - 0
+    - 79
     num_pixels: 144
-    iaqi_range: [0, 79]
-    circadian_range: [80, 143]
+    pin: 12
   shelly:
-    enabled: true
-    # Aggiungere qui tutte le Shelly presenti in rete.
-    # Solo quelle con enabled: true verranno comandate.
     devices:
-      - name: "Lampada1 Uff Sensorizzato"
-        ip: "192.168.1.191"
-        enabled: true
-      # - name: "Lampada Comodino"
-      #   ip: "192.168.1.192"
-      #   enabled: false
-  tuya_purifier:
+    - enabled: true
+      ip: 192.168.1.191
+      name: Lampada1 Uff Sensorizzato
     enabled: true
-    device_id: "30604337807d3a7f7eda"
-    ip: "192.168.0.100"
-    local_key: "EB/FoSq??wzH?xML"
-    pm25_limit: 25
-    co2_limit: 800
   tuya_ac:
+    device_id: bf189345591dfac26ehvvj
     enabled: true
-    device_id: "bf189345591dfac26ehvvj"
-    ip: "192.168.0.101"
-    local_key: "v;-khIaItEN[+-v:"
-    temp_on: 26      # accende se temp > 26°C
-    temp_off: 24     # spegne se temp < 24°C
-    temp_target: 22  # temperatura impostata sull'AC
-    mode: "c"        # c=cold | h=heat | d=dry | f=fan | a=auto
-    fan_speed: "auto"
-    temp_key: "TEMP-[C]"
-
+    fan_speed: auto
+    ip: 192.168.0.101
+    local_key: 'v;-khIaItEN[+-v:'
+    mode: c
+    temp_key: TEMP-[C]
+    temp_off: 25
+    temp_on: 26
+    temp_target: 25
+  tuya_purifier:
+    co2_limit: 800
+    device_id: 30604337807d3a7f7eda
+    enabled: true
+    ip: 192.168.0.100
+    local_key: EB/FoSq??wzH?xML
+    pm25_limit: 25
 communicator:
-  telegraf:
-    enabled: true
-    # Il token NON va qui: si legge da INFLUXDB_TOKEN nell'ambiente (.env)
-    url: "https://influxdb1.digisense.it"
-    org: "Digiplus"
-    bucket: "health_data"
-    measurement: "ZPHSensor_sensore"
-    tags:
-      sensor: "ZPHS01B"
-      client_id: "57"
-      host: "raspberry01"
-      lampada: "AS00000046"
-      stanza: "UfficioDigiplus"
   ipc:
-    method: "sqlite"  # or "redis"
-    db_path: "/tmp/digihealth.db"
-
-web:
-  enabled: true  
-  host: "0.0.0.0"  #192.168.0.104
-  port: 5000
-
+    db_path: /tmp/digihealth.db
+    method: sqlite
+  telegraf:
+    bucket: health_data
+    enabled: true
+    measurement: ZPHSensor_sensore
+    org: Digiplus
+    tags:
+      client_id: '57'
+      host: raspberry01
+      lampada: AS00000046
+      sensor: ZPHS01B
+      stanza: UfficioDigiplus
+    url: https://influxdb1.digisense.it
 logging:
-  level: "INFO"
-  file: "/var/log/digihealth-lamp.log"
-
+  file: /var/log/digihealth-lamp.log
+  level: INFO
+processors:
+  audio_comfort:
+    check_duration: 10
+    comfort_duration: 300
+    critical_threshold: 55
+    enabled: true
+    tolerance_threshold: 45
+  circadian:
+    enabled: true
+  iaqi:
+    enabled: true
+sensors:
+  door:
+    gpio_pin: 18
+  light:
+    address: 35
+    i2c_bus: 1
+  microphone:
+    device_index: 1
+    enabled: true
+    output_device_index: 0
+  window:
+    gpio_pin: 17
+  zph:
+    baudrate: 9600
+    command:
+    - 255
+    - 1
+    - 134
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 121
+    port: /dev/serial0
 thresholds:
-  co2:
-    tolerance: 801
-    critical: 1001
-  tvoc:
-    tolerance: 2
-    critical: 3
   ch2o:
-    tolerance: 0.06
     critical: 0.11
-  pm1:
-    tolerance: 10
-    critical: 20
-  pm25:
-    tolerance: 15
-    critical: 35
-  pm10:
-    tolerance: 45
-    critical: 90
+    tolerance: 0.06
   co:
-    tolerance: 7
     critical: 10
-  o3:
-    tolerance: 0.07
-    critical: 0.12
-  no2:
-    tolerance: 0.05
-    critical: 0.1
-  temp:
-    tolerance: 26
-    critical: 28.1
+    tolerance: 7
+  co2:
+    critical: 1001
+    tolerance: 801
   hum:
-    tolerance: 60
     critical: 70.1
+    tolerance: 60
   lux:
-    tolerance: 200
     critical: 100
+    tolerance: 200
+  no2:
+    critical: 0.1
+    tolerance: 0.05
+  o3:
+    critical: 0.12
+    tolerance: 0.07
+  pm1:
+    critical: 20
+    tolerance: 10
+  pm10:
+    critical: 90
+    tolerance: 45
+  pm25:
+    critical: 35
+    tolerance: 15
+  temp:
+    critical: 28.1
+    tolerance: 26
+  tvoc:
+    critical: 3
+    tolerance: 2
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: 5000
