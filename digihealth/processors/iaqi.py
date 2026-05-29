@@ -21,10 +21,10 @@ class IAQIProcessor:
     ]
 
     TVOC_BREAKPOINTS = [
-        {"C_lo": 0, "C_hi": 100, "I_lo": 0, "I_hi": 50},
-        {"C_lo": 101, "C_hi": 200, "I_lo": 51, "I_hi": 100},
-        {"C_lo": 201, "C_hi": 300, "I_lo": 101, "I_hi": 150},
-        {"C_lo": 301, "C_hi": 500, "I_lo": 151, "I_hi": 200},
+        {"C_lo": 0.0, "C_hi": 0.3, "I_lo": 0, "I_hi": 50},
+        {"C_lo": 0.31, "C_hi": 0.6, "I_lo": 51, "I_hi": 100},
+        {"C_lo": 0.61, "C_hi": 1.0, "I_lo": 101, "I_hi": 150},
+        {"C_lo": 1.01, "C_hi": 3.0, "I_lo": 151, "I_hi": 200},
     ]
 
     CH2O_BREAKPOINTS = [
@@ -53,10 +53,12 @@ class IAQIProcessor:
         iaq_co2 = self._calculate_sub_index(co2, self.CO2_BREAKPOINTS)
         iaq_tvoc = self._calculate_sub_index(tvoc, self.TVOC_BREAKPOINTS)
         iaq_ch2o = self._calculate_sub_index(ch2o, self.CH2O_BREAKPOINTS)
-        iaq_no2 = self._calculate_sub_index(no2, self.NO2_BREAKPOINTS)
+        # iaq_no2 = self._calculate_sub_index(no2, self.NO2_BREAKPOINTS)
 
         # NO2 escluso: il ZPHS01B non misura NO2, quei byte restituiscono valori non validi (~10 ppm)
-        iAQI = int(max(iaq_pm25, iaq_co2, iaq_ch2o))
+        iaq_tvoc = self._calculate_sub_index(tvoc, self.TVOC_BREAKPOINTS)
+        iAQI = int(max(iaq_pm25, iaq_co2, iaq_tvoc, iaq_ch2o))
+       
         log.debug(f"IAQI={iAQI} PM2.5={pm25:.1f}({iaq_pm25:.0f}) CO2={co2:.0f}({iaq_co2:.0f}) CH2O={ch2o:.3f}({iaq_ch2o:.0f})")
 
         data["IAQI"] = iAQI
@@ -66,7 +68,8 @@ class IAQIProcessor:
             "temp": round(data.get("TEMP-[C]", 0), 1),
             "humidity": data.get("HUM-[%]", 0),
             "co2": data.get("CO2-AnidrideCarbonica-[ppm]", 0),
-            "iaqi": iAQI
+            "iaqi": iAQI,
+            "tvoc": data.get("TVOC-QualitaAria-[G]", 0)
         }
 
         return data
