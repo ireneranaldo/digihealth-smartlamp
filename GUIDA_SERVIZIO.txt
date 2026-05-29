@@ -14,6 +14,7 @@ Cosa fa il servizio:
   5. Controlla le lampadine Shelly (luce circadiana + dimming adattivo)
   6. Controlla il purificatore PNI PTA200 (Tuya) in base a PM2.5/CO2
   7. Controlla il climatizzatore Solight DAC-12000 (Tuya) in base alla temperatura
+  8. Invia notifiche Telegram ad ogni alert ricevuto via /api/alerts
 
 Percorsi:
   Cartella progetto:  /home/digip/digihealth-lamp
@@ -234,7 +235,46 @@ una riga con lo stato di ogni attuatore abilitato:
 I widget appaiono solo per gli attuatori con enabled: true.
 
 -----------------------------------------------------
-12. SALVATAGGIO MODIFICHE CON GIT
+12. NOTIFICHE TELEGRAM
+-----------------------------------------------------
+
+Ad ogni alert ricevuto su /api/alerts il sistema invia
+automaticamente un messaggio Telegram con livello, inquinante,
+stanza e azioni eseguite.
+
+Configurazione (aggiungere nel file systemd o in .env):
+
+  TELEGRAM_BOT_TOKEN=<token del bot da @BotFather>
+  TELEGRAM_CHAT_ID=<id utente o gruppo, es. -1001234567890>
+
+Per trovare dove sono già le altre env var:
+  sudo grep -r "INFLUXDB\|DIGIHEALTH_API" /etc/systemd/system/ 2>/dev/null
+
+Se sono nel file systemd, aggiungere nella sezione [Service]:
+  Environment=TELEGRAM_BOT_TOKEN=...
+  Environment=TELEGRAM_CHAT_ID=...
+
+Poi ricaricare e riavviare:
+  sudo systemctl daemon-reload
+  sudo systemctl restart digihealth-lamp.service
+
+Per abilitare/disabilitare senza toccare le env var:
+  Modificare telegram.enabled in config/default.yaml
+  (true = attivo, false = disattivato)
+
+Test rapido di invio (dal Raspberry):
+  python3 -c "
+  import requests
+  r = requests.post('https://api.telegram.org/bot<TOKEN>/sendMessage',
+      json={'chat_id': '<CHAT_ID>', 'text': 'Test DigiHealth OK'})
+  print(r.json())
+  "
+
+Verifica nei log:
+  sudo journalctl -u digihealth-lamp.service -f | grep -i telegram
+
+-----------------------------------------------------
+13. SALVATAGGIO MODIFICHE CON GIT
 -----------------------------------------------------
 
 Dopo ogni modifica importante al codice o alla configurazione:

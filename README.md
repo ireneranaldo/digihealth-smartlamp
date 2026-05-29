@@ -18,6 +18,7 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 | **Dashboard web** | Flask su porta 5000: spettro FFT, livello dB, qualità aria, stato attuatori in tempo reale |
 | **Pagina Config** | Interfaccia web per modificare `config/default.yaml` (o `windows.yaml`) senza toccare i file; bottone **Riavvia** integrato |
 | **InfluxDB** | Invio diretto a InfluxDB Cloud via `influxdb-client` |
+| **Telegram** | Notifiche push su bot Telegram ad ogni alert ricevuto (livello, inquinante, azioni eseguite) |
 
 ---
 
@@ -114,6 +115,19 @@ Il file di configurazione caricato automaticamente su Windows è `config/windows
 Il file principale è `config/default.yaml` (Raspberry Pi) o `config/windows.yaml` (Windows).  
 È possibile sovrascrivere il file con la variabile d'ambiente `DIGIHEALTH_CONFIG`.
 
+### Variabili d'ambiente (segreti)
+
+Copiare `.env.example` in `.env` e compilare i valori:
+
+```bash
+INFLUXDB_TOKEN=...           # token InfluxDB Cloud
+DIGIHEALTH_API_KEY=...       # chiave per l'endpoint /api/alerts
+TELEGRAM_BOT_TOKEN=...       # token del bot (da @BotFather)
+TELEGRAM_CHAT_ID=...         # chat o gruppo destinatario (es. -1001234567890)
+```
+
+> Il file `.env` viene caricato automaticamente all'avvio tramite `python-dotenv`.
+
 La configurazione è modificabile anche dalla **pagina web** `http://<ip>:5000/config` senza toccare i file.
 
 ### Parametri chiave
@@ -166,6 +180,9 @@ actuators:
 web:
   enabled: true
   port: 5000
+
+telegram:
+  enabled: true   # richiede TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID come env var
 ```
 
 ### Trovare IP e local_key di un dispositivo Tuya
@@ -233,10 +250,18 @@ digihealth-lamp/
 │   │   └── tuya_ac.py              # Climatizzatore Solight DAC-12000 (Tuya v3.4)
 │   ├── communicator/
 │   │   └── telegraf_client.py
+│   ├── notifications/
+│   │   └── telegram_notifier.py    # Notifiche Telegram via Bot API
 │   └── web/
 │       ├── __init__.py             # Flask: dashboard, config, restart
+│       ├── api.py                  # Endpoint /api/alerts (ingestion alert)
+│       ├── dispatcher.py           # Dispatch alert → attuatori + Telegram
+│       ├── schemas.py              # Modelli Pydantic per gli alert
+│       ├── storage.py              # Persistenza alert su SQLite
 │       └── templates/
 │           ├── dashboard.html      # Dashboard real-time + stato attuatori
+│           ├── alerts.html         # Log alert ricevuti
+│           ├── thresholds.html     # Soglie attuatori
 │           └── config.html         # Pagina configurazione YAML + riavvio
 ├── config/
 │   ├── default.yaml                # Configurazione Raspberry Pi
@@ -263,8 +288,10 @@ Microfono USB ──┘                          │
                    InfluxDB          NeoPixel LED         Dashboard      Attuatori
                    (Cloud)           (GPIO 12)         (Flask :5000)   rete locale
                                                         /config            ├ Shelly HTTP
-                                                        /restart           ├ Tuya Purif.
-                                                                           └ Tuya AC
+                                                        /alerts            ├ Tuya Purif.
+                                                        /thresholds        └ Tuya AC
+
+Alert in ingresso → /api/alerts → dispatcher → attuatori + Telegram Bot
 ```
 
 ---
@@ -281,6 +308,8 @@ Microfono USB ──┘                          │
 | Rumore rosa non si sente (Windows) | Verificare che `audio_worker.py` sia aggiornato: il watchdog non deve interferire con `winsound` |
 | Audio comfort: nessun suono su Linux | Verificare che `mpg123` sia installato: `sudo apt install mpg123` |
 | Dashboard non raggiungibile | Verificare `web.enabled: true` e che la porta 5000 sia aperta |
+| Telegram: nessun messaggio | Verificare `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` nelle env var; controllare `telegram.enabled: true` nel YAML |
+| Telegram: `400 Bad Request` | Il `CHAT_ID` è errato o il bot non è nel gruppo; aggiungere il bot al gruppo e riprovare |
 | Shelly offline nel log | Verificare IP in config e che sia sulla stessa rete WiFi |
 | Tuya: `Connection refused` | Verificare IP e `local_key`; il dispositivo deve essere sulla LAN locale |
 | Tuya: `key` errata | Riottenere la `local_key` con `tinytuya wizard` o dall'API Tuya Cloud |
