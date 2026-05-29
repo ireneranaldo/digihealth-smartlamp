@@ -123,22 +123,6 @@
             font-size: 0.72rem; display: none;
         }
         #audio-file-select.visible { display: block; }
-        .volume-block label { font-size: 0.75rem; color: var(--text-light); }
-        .volume-slider {
-            width: 70px; height: 5px;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.35);
-            outline: none; -webkit-appearance: none;
-        }
-        .volume-slider::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 15px; height: 15px;
-            border-radius: 50%; background: var(--accent-zen);
-            cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.25);
-        }
-        .volume-slider::-moz-range-thumb {
-            width: 15px; height: 15px; border-radius: 50%;
-            background: var(--accent-zen); cursor: pointer; border: none;
-        }
 
         /* ---- TIMER + DB BAR ---- */
         .meter-panel {
@@ -515,10 +499,6 @@
                 </select>
             </div>
 
-            <div class="volume-block">
-                <label for="volume-slider">Volume</label>
-                <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.05" value="0.5">
-            </div>
         </div>
 
         <!-- riga bottoni -->
@@ -548,6 +528,7 @@
         <div>T: <span id="temp-val">--</span> °C</div>
         <div>U: <span id="hum-val">--</span> %</div>
         <div>CO2: <span id="co2-val">--</span></div>
+        <div>TVOC: <span id="tvoc-val">--</span></div>
         <div>IAQI: <span id="iaqi-val">--</span></div>
     </div>
 
@@ -808,13 +789,6 @@ function toggle() {
     fetch('/toggle').catch(() => {});
 }
 
-document.getElementById('volume-slider').addEventListener('input', function () {
-    fetch('/set_volume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ volume: parseFloat(this.value) })
-    }).catch(() => {});
-});
 
 function exitApp() {
     fetch('/shutdown_kiosk').catch(() => {});
@@ -1058,8 +1032,6 @@ function refresh() {
             bar.style.width = pct + '%';
             bar.style.background = db >= thCrit ? '#e49571' : db >= thTol ? '#d8a47f' : '#8fbfae';
 
-            // Volume slider sync
-            document.getElementById('volume-slider').value = data.volume;
 
             // ── Overlay CHECK ──────────────────────────────────────────
             const checkEl   = document.getElementById('check-overlay');
@@ -1099,6 +1071,7 @@ function refresh() {
                 document.getElementById('temp-val').innerText = a.temp     ?? '--';
                 document.getElementById('hum-val').innerText  = a.humidity ?? '--';
                 document.getElementById('co2-val').innerText  = a.co2      ?? '--';
+                document.getElementById('tvoc-val').innerText = a.tvoc != null ? a.tvoc.toFixed(2) : '--';
                 const iEl = document.getElementById('iaqi-val');
                 iEl.innerText   = a.iaqi ?? '--';
                 iEl.style.color = a.iaqi > 100 ? 'var(--accent-red)'
