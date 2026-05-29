@@ -34,6 +34,9 @@ class WebConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 5000
 
+class TelegramConfig(BaseModel):
+    enabled: bool = False
+
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     file: Optional[str] = None
@@ -42,6 +45,8 @@ class Secrets(BaseModel):
     """Segreti caricati da variabili d'ambiente (mai da YAML/git)."""
     influxdb_token: Optional[str] = Field(default_factory=lambda: os.getenv("INFLUXDB_TOKEN"))
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("DIGIHEALTH_API_KEY"))
+    telegram_bot_token: Optional[str] = Field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN"))
+    telegram_chat_id: Optional[str] = Field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID"))
 
 class DigiHealthConfig(BaseModel):
     sensors: SensorConfig = Field(default_factory=SensorConfig)
@@ -49,6 +54,7 @@ class DigiHealthConfig(BaseModel):
     actuators: ActuatorConfig = Field(default_factory=ActuatorConfig)
     communicator: CommunicatorConfig = Field(default_factory=CommunicatorConfig)
     web: WebConfig = Field(default_factory=WebConfig)
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     thresholds: Dict[str, Any] = Field(default_factory=dict)
     secrets: Secrets = Field(default_factory=Secrets)

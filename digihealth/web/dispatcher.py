@@ -13,6 +13,7 @@ from typing import List, Optional
 from ..logger import logger
 from . import storage
 from .schemas import NormalizedAlert
+from ..notifications import telegram_notifier
 
 DEFAULT_HOLD_MIN = 15.0           # durata forzatura se l'alert non la specifica
 COLOR_CRITICAL = (255, 0, 0)      # rosso
@@ -94,6 +95,14 @@ class ActionDispatcher:
                             alert.action_code, done, hold)
         except Exception as e:
             logger.debug(f"Dispatcher: set_alert_event fallito: {e}")
+
+        # Notifica Telegram (non bloccante).
+        try:
+            from ..config import config
+            if config.telegram.enabled:
+                telegram_notifier.send_alert(alert, alert_id, summary, category)
+        except Exception as e:
+            logger.debug(f"Dispatcher: telegram_notifier fallito: {e}")
 
         return {"action_taken": summary, "targets": done, "hold_seconds": hold}
 
