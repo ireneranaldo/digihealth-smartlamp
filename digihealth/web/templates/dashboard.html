@@ -156,13 +156,13 @@
 
         /* ---- AIR QUALITY ROW ---- */
         .air-quality-row {
-            display: flex; justify-content: space-around;
-            font-weight: bold; font-size: 0.9rem;
+            display: flex; justify-content: space-around; flex-wrap: wrap; gap: 6px;
+            font-weight: bold; font-size: 2rem;
         }
         .air-quality-row span {
             background: rgba(255,255,255,0.4);
-            padding: 2px 10px; border-radius: 6px;
-            min-width: 44px; display: inline-block; text-align: center;
+            padding: 4px 16px; border-radius: 8px;
+            min-width: 80px; display: inline-block; text-align: center;
         }
 
         /* ---- ACTUATORS ROW ---- */
@@ -171,21 +171,21 @@
             padding: 0 2px;
         }
         .act-card {
-            display: flex; align-items: center; gap: 6px;
-            padding: 6px 14px;
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 20px;
             background: rgba(255,255,255,0.38);
             border: 1px solid rgba(208,170,132,0.4);
             border-radius: 10px;
-            font-size: 0.92rem;
+            font-size: 1.6rem;
         }
         .act-dot {
-            width: 12px; height: 12px; border-radius: 50%;
+            width: 18px; height: 18px; border-radius: 50%;
             flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1);
         }
         .act-name { font-weight: 600; color: var(--text-light); }
         .act-on   { font-weight: 700; color: #4a7c5f; }
         .act-off  { color: #bbb; }
-        .act-sub  { font-size: 0.82rem; color: #aaa; }
+        .act-sub  { font-size: 1.2rem; color: #aaa; }
 
         /* ---- AC ACTIVE CARD ---- */
         .act-card.ac-active {
