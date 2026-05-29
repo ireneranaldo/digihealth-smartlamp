@@ -326,6 +326,7 @@ class WebManager:
                 "temp":     round(float(t), 1) if t not in (None, '--') else '--',
                 "humidity": processed_data.get('HUM-[%]', '--'),
                 "co2":      processed_data.get('CO2-AnidrideCarbonica-[ppm]', '--'),
+                "tvoc":     processed_data.get('TVOC-QualitaAria-[G]', '--'),
                 "iaqi":     processed_data.get('IAQI', '--'),
             }
         except Exception as e:
