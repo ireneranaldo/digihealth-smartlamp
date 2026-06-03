@@ -45,9 +45,9 @@ communicator:
     tags:
       client_id: '57'
       host: raspberry01
-      lampada: AS00000046
+      lampada: AS00000077
       sensor: ZPHS01B
-      stanza: UfficioDigiplus
+      stanza: UfficioIngresso
     url: https://influxdb1.digisense.it
 logging:
   file: /var/log/digihealth-lamp.log
