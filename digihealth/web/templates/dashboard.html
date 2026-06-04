@@ -33,17 +33,17 @@
 
         /* ---- TOP PANEL ---- */
         .top-panel {
-            display: flex; flex-direction: column; gap: 10px;
+            display: flex; flex-direction: column; gap: 12px;
             background: linear-gradient(140deg, #eaf4ff, #d0e8f8);
             box-shadow: 0 8px 20px var(--panel-shadow);
-            padding: 12px 16px;
+            padding: 18px 22px;
             border-radius: 20px;
             border: 1px solid rgba(208,170,132,0.4);
         }
         .top-row {
             display: grid;
             grid-template-columns: 1.2fr 0.9fr 1fr 1.6fr 0.8fr;
-            gap: 8px; align-items: center;
+            gap: 12px; align-items: center;
         }
         .btn-row {
             display: flex; justify-content: center; align-items: center;
@@ -52,14 +52,14 @@
             border-top: 1px solid rgba(208,170,132,0.3);
         }
         .mode-block { display: flex; flex-direction: column; gap: 2px; }
-        #mode-text  { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
-        #mode-sub   { font-size: 0.75rem; color: #999; }
+        #mode-text  { font-size: 1.4rem; font-weight: bold; color: var(--accent-yellow); }
+        #mode-sub   { font-size: 0.9rem; color: #999; }
 
         .db-block   { text-align: center; }
-        #db-display { font-size: 2.6rem; font-weight: bold; line-height: 1; }
+        #db-display { font-size: 3.2rem; font-weight: bold; line-height: 1; }
         .unit       { font-size: 0.9rem; color: #999; }
 
-        .threshold-block { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+        .threshold-block { display: flex; flex-direction: column; gap: 6px; font-size: 0.95rem; }
         .th-row { display: flex; justify-content: space-between; gap: 8px; }
         .th-label { color: #aaa; }
         .th-val { font-weight: 700; }
@@ -67,8 +67,8 @@
         #th-crit-val { color: var(--accent-red); }
 
         .btn {
-            padding: 7px 12px;
-            font-size: 0.75rem; font-weight: 700;
+            padding: 9px 16px;
+            font-size: 0.85rem; font-weight: 700;
             border-radius: 999px;
             border: 2px solid rgba(255,255,255,0.2);
             cursor: pointer;
@@ -87,7 +87,7 @@
             background: rgba(255,255,255,0.18);
             color: rgba(97,76,67,0.85);
             border: 1px solid rgba(123,85,72,0.25);
-            font-size: 0.68rem; padding: 5px 8px;
+            font-size: 0.78rem; padding: 7px 12px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             opacity: 0.55;
         }
@@ -97,18 +97,18 @@
         .device-id {
             margin-right: auto;
             display: flex; align-items: baseline; gap: 6px;
-            font-size: 0.72rem;
+            font-size: 0.85rem;
             color: rgba(77,60,47,0.55);
-            padding: 4px 10px;
+            padding: 6px 14px;
             background: rgba(255,255,255,0.35);
             border: 1px solid rgba(208,170,132,0.35);
             border-radius: 999px;
         }
-        .device-id .device-label { letter-spacing: 0.5px; text-transform: uppercase; font-size: 0.65rem; }
+        .device-id .device-label { letter-spacing: 0.5px; text-transform: uppercase; font-size: 0.75rem; }
         .device-id .device-code  { font-weight: 700; letter-spacing: 1px; color: var(--text-light); }
 
-        .audio-block { display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; }
-        .audio-block label { color: #aaa; font-size: 0.72rem; }
+        .audio-block { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+        .audio-block label { color: #aaa; font-size: 0.82rem; }
         .audio-toggle { display: flex; gap: 6px; }
         .audio-toggle button {
             flex: 1; padding: 4px 6px; border-radius: 20px; border: 1px solid rgba(202,142,123,0.4);
@@ -504,8 +504,9 @@
         <!-- riga bottoni -->
         <div class="btn-row">
             <div class="device-id">
-                <span class="device-label">Codice lampada</span>
-                <span class="device-code">AS00000046</span>
+                <span class="device-label">{{ device_stanza }}</span>
+                <span class="device-label" style="opacity:0.4">·</span>
+                <span class="device-code">{{ device_lampada }}</span>
             </div>
             <button id="calBtn"  class="btn btn-cal" onclick="runCalibration()">Calibra</button>
             <button id="mainBtn" class="btn btn-toggle-off" onclick="toggle()">Avvia</button>
@@ -529,6 +530,7 @@
         <div>U: <span id="hum-val">--</span> %</div>
         <div>CO2: <span id="co2-val">--</span></div>
         <div>TVOC: <span id="tvoc-val">--</span></div>
+        <div>Lux: <span id="lux-val">--</span></div>
         <div>IAQI: <span id="iaqi-val">--</span></div>
     </div>
 
@@ -1072,6 +1074,7 @@ function refresh() {
                 document.getElementById('hum-val').innerText  = a.humidity ?? '--';
                 document.getElementById('co2-val').innerText  = a.co2      ?? '--';
                 document.getElementById('tvoc-val').innerText = a.tvoc != null ? a.tvoc.toFixed(2) : '--';
+                document.getElementById('lux-val').innerText  = a.lux != null && a.lux !== '--' ? Math.round(a.lux) : '--';
                 const iEl = document.getElementById('iaqi-val');
                 iEl.innerText   = a.iaqi ?? '--';
                 iEl.style.color = a.iaqi > 100 ? 'var(--accent-red)'

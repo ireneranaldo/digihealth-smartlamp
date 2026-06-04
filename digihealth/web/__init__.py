@@ -107,7 +107,11 @@ def _send_cmd(cmd):
 # ── Route Flask ───────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return render_template('dashboard.html')
+    tags = config.communicator.telegraf.get("tags", {})
+    return render_template('dashboard.html',
+        device_lampada=tags.get("lampada", ""),
+        device_stanza=tags.get("stanza", ""),
+    )
 
 
 @app.route('/status')
@@ -327,6 +331,7 @@ class WebManager:
                 "humidity": processed_data.get('HUM-[%]', '--'),
                 "co2":      processed_data.get('CO2-AnidrideCarbonica-[ppm]', '--'),
                 "tvoc":     processed_data.get('TVOC-QualitaAria-[G]', '--'),
+                "lux":      processed_data.get('lux-IntensitaLuminosa', '--'),
                 "iaqi":     processed_data.get('IAQI', '--'),
             }
         except Exception as e:

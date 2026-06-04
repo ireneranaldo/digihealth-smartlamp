@@ -7,6 +7,7 @@ sugli attuatori tramite il dispatcher.
 import threading
 from flask import Blueprint, jsonify, request
 from ..logger import logger
+from ..config import config
 from .auth import require_api_key
 from .schemas import parse_alert, ValidationError
 from . import storage
@@ -17,9 +18,9 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 # Istanza condivisa: WebManager.set_actuator_manager() la collega agli attuatori.
 dispatcher = ActionDispatcher()
 
-# ID hardcoded della lampada gestita da questo Raspberry. Gli alert con
-# campo "lampada" diverso vengono salvati ma non azionano gli attuatori.
-EXPECTED_LAMPADA = "AS00000046"
+# ID della lampada gestita da questo Raspberry, letto dalla config (telegraf.tags.lampada).
+# Gli alert con campo "lampada" diverso vengono salvati ma non azionano gli attuatori.
+EXPECTED_LAMPADA = (config.communicator.telegraf.get("tags", {}).get("lampada") or "").strip()
 
 
 def _client_ip() -> str:
