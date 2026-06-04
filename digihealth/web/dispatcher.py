@@ -8,6 +8,7 @@ durata (`action_due_minutes` del payload, fallback DEFAULT_HOLD_MIN minuti).
 Durante la forzatura il ciclo sensori a 30s non tocca il dispositivo
 (vedi guardie `_override_until` / `_alert_until` negli attuatori).
 """
+import threading
 import time
 from typing import List, Optional
 from ..logger import logger
