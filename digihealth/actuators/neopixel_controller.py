@@ -99,7 +99,6 @@ class NeoPixelController:
 
         try:
             iaqi = data.get('IAQI', 0)
-            lux  = data.get('lux-IntensitaLuminosa', 0)
             self._last_iaqi = iaqi
 
             if not self._is_active_time():
@@ -114,9 +113,12 @@ class NeoPixelController:
             self._last_color_hex = '#{:02x}{:02x}{:02x}'.format(*color)
             self._set_iaqi_breathing(color)
 
-            temp_k, brightness = self._calculate_circadian_light(lux)
-            rgb = self._kelvin_to_rgb(temp_k)
-            self._set_circadian_segment(rgb, brightness)
+            # -- Segmento circadiano disabilitato: la luce circadiana è gestita
+            #    dalle lampadine Shelly. Decommentare per riattivare.
+            # lux = data.get('lux-IntensitaLuminosa', 0)
+            # temp_k, brightness = self._calculate_circadian_light(lux)
+            # rgb = self._kelvin_to_rgb(temp_k)
+            # self._set_circadian_segment(rgb, brightness)
 
             self.pixels.show()
 
@@ -142,7 +144,7 @@ class NeoPixelController:
         r, g, b = color
         factor = 0.2 + 0.8 * (math.sin((time.time() - self.start_time) * 0.05) + 1) / 2
         limiter = 0.3
-        for i in range(self.iaqi_range[0], self.iaqi_range[1] + 1):
+        for i in range(self.num_pixels):
             self.pixels[i] = (int(r*factor*limiter), int(g*factor*limiter), int(b*factor*limiter))
 
     def _kelvin_to_rgb(self, temp_k: int) -> tuple:
