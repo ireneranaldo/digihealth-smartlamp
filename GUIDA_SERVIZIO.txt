@@ -17,17 +17,14 @@ Cosa fa il servizio:
   8. Invia notifiche Telegram ad ogni alert ricevuto via /api/alerts
 
 Percorsi:
-  Cartella progetto:  /home/digip/digihealth-lamp
+  Cartella progetto:  /home/digip/digihealth-smartlamp
   File di servizio:   /etc/systemd/system/digihealth-lamp.service
-  Ambiente virtuale:  /home/digip/digihealth-lamp/venv/
+  Ambiente virtuale:  /home/digip/digihealth-smartlamp/venv/
   Log di sistema:     journalctl -u digihealth-lamp
 
-NOTA: Il file systemd/digihealth-lamp.service nel repository usa
-User=pi e WorkingDirectory=/home/pi/digihealth-lamp come defaults.
-Prima di installarlo, modificalo con il tuo utente (es. digip):
-  User=digip
-  WorkingDirectory=/home/digip/digihealth-lamp
-  ExecStart=/home/digip/digihealth-lamp/venv/bin/python3 -m digihealth.main
+NOTA: Il servizio deve girare come User=root per permettere alla striscia
+NeoPixel di accedere a /dev/mem. Il file .env viene caricato tramite
+EnvironmentFile nel file .service — non usare Environment= inline.
 
 -----------------------------------------------------
 1. STATO DEL SERVIZIO
@@ -158,10 +155,14 @@ Via file (alternativa):
   3. Aggiungi/modifica i dispositivi nella lista devices
   4. Riavvia il servizio
 
-Logica circadiana:
+Logica circadiana (gestita dalle Shelly):
   07:00-15:59 → luce fredda (6500K)
   16:00-06:59 → luce calda (2700K)
   Luminosità:  adattiva in base al lux del sensore BH1750
+
+NOTA: la luce circadiana è ora gestita interamente dalle lampadine Shelly.
+La striscia NeoPixel usa tutti i 144 pixel esclusivamente per visualizzare
+l'IAQI con effetto breathing colorato.
 
 La dashboard mostra la lampadina con il colore reale (caldo/freddo)
 e l'intensità del glow in base alla brightness corrente.
@@ -242,21 +243,17 @@ Ad ogni alert ricevuto su /api/alerts il sistema invia
 automaticamente un messaggio Telegram con livello, inquinante,
 stanza e azioni eseguite.
 
-Configurazione (aggiungere nel file systemd o in .env):
+Configurazione tramite file .env (metodo corretto):
 
-  TELEGRAM_BOT_TOKEN=<token del bot da @BotFather>
-  TELEGRAM_CHAT_ID=<id utente o gruppo, es. -1001234567890>
-
-Per trovare dove sono già le altre env var:
-  sudo grep -r "INFLUXDB\|DIGIHEALTH_API" /etc/systemd/system/ 2>/dev/null
-
-Se sono nel file systemd, aggiungere nella sezione [Service]:
-  Environment=TELEGRAM_BOT_TOKEN=...
-  Environment=TELEGRAM_CHAT_ID=...
-
-Poi ricaricare e riavviare:
-  sudo systemctl daemon-reload
-  sudo systemctl restart digihealth-lamp.service
+  1. Aprire /home/digip/digihealth-smartlamp/.env
+  2. Aggiungere o verificare le righe:
+       TELEGRAM_BOT_TOKEN=<token del bot da @BotFather>
+       TELEGRAM_CHAT_ID=<id utente o gruppo, es. -1001234567890>
+  3. Verificare che il file .service abbia nella sezione [Service]:
+       EnvironmentFile=/home/digip/digihealth-smartlamp/.env
+  4. Ricaricare e riavviare:
+       sudo systemctl daemon-reload
+       sudo systemctl restart digihealth-lamp.service
 
 Per abilitare/disabilitare senza toccare le env var:
   Modificare telegram.enabled in config/default.yaml

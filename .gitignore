@@ -12,7 +12,6 @@ build/
 *.env
 !.env.example
 CHIAVI_CONFIG.md
-INSTALLAZIONE_NUOVA_LAMPADA.txt
 
 # Database SQLite locali
 *.db

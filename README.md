@@ -9,8 +9,8 @@ Sistema di monitoraggio ambientale indoor basato su Raspberry Pi. Legge sensori 
 | Modulo | Descrizione |
 |---|---|
 | **Sensori** | ZPH01B (PM1/PM2.5/PM10, CO2, TVOC, CH2O, temperatura, umidità) via UART; BH1750 (lux) via I2C; microfono USB |
-| **IAQI** | Calcolo Indice di Qualità dell'Aria Interna secondo breakpoint standard (PM2.5, CO2, TVOC, CH2O) |
-| **NeoPixel** | Striscia 144 LED: pixel 0–79 visualizzano IAQI con effetto breathing, pixel 80–143 simulano la luce circadiana |
+| **IAQI** | Calcolo Indice di Qualità dell'Aria Interna secondo breakpoint standard (PM2.5, PM10, CO, CO2, TVOC, CH2O) |
+| **NeoPixel** | Striscia 144 LED: tutti i pixel visualizzano l'IAQI con effetto breathing colorato |
 | **Shelly** | Lampadine smart via HTTP API: luce circadiana (6500K giorno / 2700K sera) e dimming adattivo in base al lux |
 | **Purificatore Tuya** | PNI PTA200 via Tuya local API: accensione automatica se PM2.5 > 25 µg/m³ o CO2 > 800 ppm |
 | **Climatizzatore Tuya** | Solight DAC-12000 via Tuya local API (v3.4): accensione/spegnimento automatico in base alla temperatura, con isteresi |
