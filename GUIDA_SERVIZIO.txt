@@ -243,32 +243,91 @@ Ad ogni alert ricevuto su /api/alerts il sistema invia
 automaticamente un messaggio Telegram con livello, inquinante,
 stanza e azioni eseguite.
 
-Configurazione tramite file .env (metodo corretto):
+Il messaggio include:
+  - Livello alert (WARNING / CRITICAL)
+  - Categoria (Qualita aria / Temperatura / Generico)
+  - Stanza e inquinante dominante
+  - Valore che ha scatenato l'alert
+  - Azioni eseguite (purificatore, AC, NeoPixel)
+  - ID alert interno
 
-  1. Aprire /home/digip/digihealth-smartlamp/.env
-  2. Aggiungere o verificare le righe:
-       TELEGRAM_BOT_TOKEN=<token del bot da @BotFather>
-       TELEGRAM_CHAT_ID=<id utente o gruppo, es. -1001234567890>
-  3. Verificare che il file .service abbia nella sezione [Service]:
-       EnvironmentFile=/home/digip/digihealth-smartlamp/.env
-  4. Ricaricare e riavviare:
-       sudo systemctl daemon-reload
-       sudo systemctl restart digihealth-lamp.service
+--- A. CREARE IL BOT ---
 
-Per abilitare/disabilitare senza toccare le env var:
-  Modificare telegram.enabled in config/default.yaml
-  (true = attivo, false = disattivato)
+  1. Apri Telegram e cerca @BotFather
+  2. Scrivi /newbot
+  3. Scegli un nome (es. "DigiHealth Alarm")
+  4. Scegli uno username (deve finire in "bot", es. digihealth_alarm_bot)
+  5. BotFather risponde con il TOKEN del bot, es.:
+       8830128600:AAEWhxBE98OfwWB0Z6Tm-JWssW7eXzAHeZw
+  6. Salva questo token — ti serve nel .env
 
-Test rapido di invio (dal Raspberry):
-  python3 -c "
-  import requests
-  r = requests.post('https://api.telegram.org/bot<TOKEN>/sendMessage',
-      json={'chat_id': '<CHAT_ID>', 'text': 'Test DigiHealth OK'})
-  print(r.json())
-  "
+  NOTA: uno stesso bot può mandare messaggi a più gruppi/lampade.
+  Non serve creare un bot per ogni lampada.
 
-Verifica nei log:
+--- B. CREARE IL GRUPPO E AGGIUNGERE IL BOT ---
+
+  1. In Telegram crea un nuovo gruppo (es. "DIGI-HSM Allarmi Ufficio")
+  2. Aggiungi il bot al gruppo cercando il suo username
+  3. (Opzionale) Rendilo amministratore se vuoi che possa leggere tutti i messaggi
+
+--- C. OTTENERE IL CHAT ID DEL GRUPPO ---
+
+  Metodo più semplice — manda un messaggio nel gruppo poi apri:
+    https://api.telegram.org/bot<TOKEN>/getUpdates
+
+  Cerca nel JSON il campo "chat":{"id": -XXXXXXXXX}
+  Il chat_id del gruppo è NEGATIVO (es. -5126280398).
+
+  Oppure aggiungi @userinfobot al gruppo: risponde con l'ID.
+
+--- D. CONFIGURARE IL .env ---
+
+  Aprire /home/digip/digihealth-smartlamp/.env e impostare:
+
+    TELEGRAM_BOT_TOKEN=<token ottenuto da BotFather>
+    TELEGRAM_CHAT_ID=<chat id del gruppo, numero negativo>
+
+  Verificare che il file .service abbia nella sezione [Service]:
+    EnvironmentFile=/home/digip/digihealth-smartlamp/.env
+
+  Ricaricare e riavviare:
+    sudo systemctl daemon-reload
+    sudo systemctl restart digihealth-lamp.service
+
+--- E. TESTARE L'INVIO ---
+
+  Dal Raspberry con curl:
+    curl -s "https://api.telegram.org/bot<TOKEN>/sendMessage" \
+      -d chat_id=<CHAT_ID> \
+      -d text="Test DigiHealth OK"
+
+  Risposta attesa: {"ok":true,...}
+  Se risponde {"ok":false,"error_code":401}: token non valido, rigenerarlo
+  da @BotFather con /mybots → Revoke current token.
+
+  Test completo alert (simula un alert reale):
+    curl -s -X POST http://localhost:5000/api/alerts \
+      -H "Content-Type: application/json" \
+      -H "X-Api-Key: <DIGIHEALTH_API_KEY>" \
+      -d '{"event_type":"air_quality","level":"WARNING",
+           "lampada":"<CODICE_LAMPADA>","stanza":"<STANZA>",
+           "dominant_pollutant":"CO2","trigger_metric":"CO2",
+           "trigger_value":850,"action_code":"VENTILATE"}'
+
+--- F. ABILITARE / DISABILITARE ---
+
+  In config/default.yaml:
+    telegram:
+      enabled: true   ← true = attivo, false = disattivato
+
+--- G. VERIFICA NEI LOG ---
+
   sudo journalctl -u digihealth-lamp.service -f | grep -i telegram
+
+  Messaggi attesi:
+    INFO  Telegram: notifica inviata per alert id=X   ← OK
+    DEBUG Telegram: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID non impostati  ← .env non caricato
+    WARNING Telegram: risposta non ok (401)           ← token non valido
 
 -----------------------------------------------------
 13. SALVATAGGIO MODIFICHE CON GIT
